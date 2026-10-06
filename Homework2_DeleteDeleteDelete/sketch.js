@@ -18,14 +18,22 @@ let leafH_ratio = 0.65; // 세로 크기 살짝 확대 (기존 0.55)
 
 let nextSpawnTime = 0; // 다음 사과가 생성될 시간
 
+//사과나무 흔들어재껴껴겨겨ㅕㄱ겨겨겨겨겨
+let isHoldingTree = false;
+let treePressTime = 0;
+let treeStartX = 0;
+let treeStartY = 0;
+let isTreeShaking = false;
+
 function preload() {
   imgs.sky = loadImage("sky.png");
-  imgs.tree = loadImage("apple_tree.png"); // 절벽 포함된 나무 기둥
-  imgs.leaf = loadImage("leaf.png"); // 나뭇잎
+  imgs.tree = loadImage("apple_tree.png");
+  imgs.leaf = loadImage("leaf.png");
   imgs.apple1 = loadImage("apple_1.png");
   imgs.apple2 = loadImage("apple_2.png");
   imgs.apple3 = loadImage("apple_3.png");
   imgs.bird = loadImage("bird.png");
+  imgs.nest = loadImage("bird_nest.png"); // 👈 [추가] 새 둥지 이미지 로드
 }
 
 function setup() {
@@ -33,7 +41,7 @@ function setup() {
   imageMode(CENTER);
 
   engine = Engine.create();
-  engine.gravity.y = 1;
+  engine.gravity.y = 3.5;
 }
 
 function draw() {
@@ -50,23 +58,95 @@ function draw() {
   // 2. Leaf (하늘 앞, 나무 기둥 뒤)
   image(imgs.leaf, leafX, leafY, leafW, leafH);
 
-  // 3. Apple Tree (나뭇잎 앞, 우측 하단 정렬)
-  let treeW = width * 0.9; // 나무 크기 확대 (기존 0.7에서 0.85로 변경)
-  let treeH = treeW * 0.55; // 나무 세로 비율
+  // 3. Apple Tree 기본 위치
+  let treeW = width * 0.85;
+  let treeH = treeW * 0.55;
   let treeX = width - treeW / 2 + 50;
   let treeY = height - treeH / 2;
-  image(imgs.tree, treeX, treeY, treeW, treeH);
 
-  // 4. 사과 무작위 생성 (0.5초 ~ 2초 간격)
+  let renderTreeX = treeX;
+  let renderTreeY = treeY;
+  let renderLeafX = leafX;
+  let renderLeafY = leafY;
+
+  // 💡 [좌우 왕복 흔들기 및 누적 시간 2초 조건 로직 (0.2초 유예 시간 적용)]
+  if (isHoldingTree && mouseIsPressed) {
+    // 이전 프레임과 비교하여 마우스가 좌우로 움직인 방향(변화량) 체크
+    let deltaX = mouseX - pmouseX;
+
+    // 좌우로 왔다 갔다 하는지 확인하기 위해 방향 전환 감지 변수 활용
+    let isMovingBackAndForth = abs(deltaX) > 0.3; // 판정을 살짝 널널하게(0.3) 조정
+
+    if (isMovingBackAndForth) {
+      isTreeShaking = true;
+      let shakeX = random(-6, 6);
+      let shakeY = random(-6, 6);
+
+      renderTreeX += shakeX;
+      renderTreeY += shakeY;
+      renderLeafX += shakeX;
+      renderLeafY += shakeY;
+
+      // 움직임이 감지될 때마다 최근 활동 시간(lastActiveTime)을 갱신합니다.
+      lastActiveTime = millis();
+
+      // 💡 흔들고 있는 동안에만 유효한 누적 시간 증가
+      if (typeof shakeStartTime === "undefined") {
+        shakeStartTime = millis(); // 흔들기 시작한 시점
+      }
+
+      let shakenDuration = millis() - shakeStartTime; // 실제 흔든 누적 시간
+
+      // 흔들린 누적 시간이 2초(2000밀리초) 이상이 되면 사과 전체 낙하!
+      if (shakenDuration >= 2000) {
+        for (let a of apples) {
+          if (a.state === "ATTACHED") {
+            a.fall(true);
+          }
+        }
+        isHoldingTree = false;
+        isTreeShaking = false;
+        shakeStartTime = undefined;
+        lastActiveTime = undefined;
+      }
+    } else {
+      // 💡 마우스 움직임이 멈췄더라도, 마지막 활동 시간으로부터 0.2초(200ms) 이내라면 시간을 리셋하지 않고 유지합니다!
+      if (
+        typeof lastActiveTime !== "undefined" &&
+        millis() - lastActiveTime < 200
+      ) {
+        isTreeShaking = true; // 떨림 유지
+        // shakeStartTime은 유지되므로 시간이 리셋되지 않음
+      } else {
+        // 0.2초 이상 완전히 멈춰있을 때만 리셋
+        isTreeShaking = false;
+        shakeStartTime = undefined;
+      }
+    }
+  } else {
+    isHoldingTree = false;
+    isTreeShaking = false;
+    shakeStartTime = undefined;
+    lastActiveTime = undefined;
+  }
+
+  // 💡 흔들림이 적용된 좌표로 나뭇잎과 나무 출력
+  image(imgs.leaf, renderLeafX, renderLeafY, leafW, leafH);
+
+  // (이 사이에 사과들을 그리는 루프가 위치합니다)
+
+  image(imgs.tree, renderTreeX, renderTreeY, treeW, treeH);
+
+  // 4. 🍎 사과 무작위 생성 (0.5초 ~ 2초 간격) -> 이 코드가 있는지 확인하세요!
   if (millis() > nextSpawnTime) {
     spawnApple(leafX, leafY, leafW, leafH);
-    nextSpawnTime = millis() + random(500, 2000);
+    nextSpawnTime = millis() + random(400, 1500);
   }
 
-  // 5. 새 생성
-  if (frameCount % 130 === 0 && random() > 0.3) {
-    birds.push(new Bird(leafY, leafH));
-  }
+  // 5. 나무 아래 절벽 쪽에 새 둥지 그리기
+  let nestX = width * 0.82; // 둥지 X 위치 (필요시 조절 가능)
+  let nestY = height * 0.835; // 둥지 Y 위치
+  image(imgs.nest, nestX, nestY, 100, 70); // 둥지 크기 (가로 90, 세로 70)
 
   // 6. 새 업데이트 및 그리기
   for (let i = birds.length - 1; i >= 0; i--) {
@@ -197,7 +277,7 @@ class Bird {
 
     // 나뭇잎 높이 부근에서 비행
     this.y = leafY + random(-leafH * 0.3, leafH * 0.3);
-    this.speed = random(4, 9);
+    this.speed = random(6, 11);
     this.w = 80;
     this.h = 50;
     this.hasApple = false;
@@ -230,17 +310,53 @@ function spawnApple(cx, cy, w, h) {
   apples.push(new Apple(spawnX, spawnY));
 }
 
-// 마우스 클릭 시 사과 떨어뜨리기 (클릭했으므로 true 전달)
 function mousePressed() {
+  let leafY = height * leafY_ratio;
+  let leafH = height * leafH_ratio;
+
+  // 1. 🍎 개별 사과를 클릭했는지 가장 먼저 체크 (레벨 1)
   for (let a of apples) {
     if (a.state === "ATTACHED") {
       let d = dist(mouseX, mouseY, a.body.position.x, a.body.position.y);
       if (d < a.r) {
-        a.fall(true); // 👈 true를 전달하여 톡 튀어오르게 만듦
-        break;
+        a.fall(true); // 마우스 클릭 시 톡 튀어오름
+        return; // 사과를 클릭했으면 아래 나무/둥지 로직은 실행 안 함
       }
     }
   }
+
+  // 2. 새 둥지 클릭 체크
+  let nestX = width * 0.82;
+  let nestY = height * 0.835;
+  let dNest = dist(mouseX, mouseY, nestX, nestY);
+  if (dNest < 45) {
+    birds.push(new Bird(leafY, leafH));
+    return;
+  }
+
+  // 3. 🌳 나무(apple_tree)를 누르기 시작했는지 체크
+  let treeW = width * 0.85;
+  let treeH = treeW * 0.55;
+  let treeX = width - treeW / 2 + 50;
+  let treeY = height - treeH / 2;
+
+  if (
+    mouseX > treeX - treeW / 2 &&
+    mouseX < treeX + treeW / 2 &&
+    mouseY > treeY - treeH / 2 &&
+    mouseY < treeY + treeH / 2
+  ) {
+    isHoldingTree = true;
+    treePressTime = millis();
+    treeStartX = mouseX;
+    treeStartY = mouseY;
+  }
+}
+
+// 💡 [추가] 마우스를 뗄 때 상태 초기화
+function mouseReleased() {
+  isHoldingTree = false;
+  isTreeShaking = false;
 }
 
 function windowResized() {
