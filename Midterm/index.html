@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Capture to Memo!</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        display: flex;
+        height: 100vh;
+        font-family: "Pretendard", sans-serif;
+        background-color: #fbf5e7;
+        color: #333;
+        overflow: hidden;
+      }
+
+      #left-panel {
+        width: 280px;
+        border-right: 2px solid #e0dacc;
+        padding: 20px;
+        box-sizing: border-box;
+        background-color: #fbf5e7;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      #app-title-bar {
+        width: 100%;
+        height: 50px;
+        background-color: #ffffff;
+        border: 2px solid #024466;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 10px rgba(2, 68, 102, 0.1);
+      }
+      #app-title-bar h1 {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 900;
+        color: #024466;
+        letter-spacing: 0.5px;
+      }
+
+      .phone-box {
+        border: 2px dashed #aaa;
+        background-color: #fff;
+        height: 180px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: grab;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      }
+      .phone-box img {
+        max-width: 90%;
+        max-height: 90%;
+        pointer-events: none;
+      }
+
+      #center-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: #fbf5e7;
+        position: relative;
+      }
+      #canvas-container {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fff;
+      }
+
+      #deco-modal {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+      }
+      .modal-content {
+        background: #fff;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+        display: flex;
+        gap: 30px;
+        align-items: center;
+      }
+      .modal-left {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        align-items: center;
+      }
+
+      #popup-workspace {
+        width: 260px;
+        height: 200px;
+        background: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      /* 이미지가 작아지지 않도록 max-width, max-height를 100%로 수정 */
+      #popup-preview-img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        position: absolute;
+        z-index: 1;
+        pointer-events: none;
+      }
+
+      .popup-sticker {
+        position: absolute;
+        cursor: grab;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        z-index: 5;
+      }
+      .popup-sticker:active {
+        cursor: grabbing;
+      }
+
+      .modal-right {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .modal-right textarea {
+        width: 260px;
+        height: 320px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        resize: none;
+        font-family: inherit;
+        font-size: 0.95rem;
+        background-color: #faf9f5;
+        outline: none;
+      }
+
+      .sticker-container {
+        display: flex;
+        gap: 10px;
+      }
+      .sticker-btn {
+        background-color: #f4f4f4;
+        border: 1px solid #ddd;
+        font-size: 0.9rem;
+        font-weight: bold;
+        padding: 8px 12px;
+        border-radius: 5px;
+        cursor: pointer;
+        color: #333;
+      }
+      .sticker-btn:hover {
+        background-color: #e0e0e0;
+      }
+
+      input[type="text"] {
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        width: 100%;
+        outline: none;
+      }
+      button {
+        padding: 10px 20px;
+        cursor: pointer;
+        font-weight: bold;
+        border: none;
+        border-radius: 5px;
+        background-color: #4caf50;
+        color: white;
+        transition: 0.2s;
+      }
+      #fix-btn {
+        background-color: #ff9800;
+        width: 100%;
+      }
+
+      #right-panel {
+        width: 320px;
+        border-left: 2px solid #e0dacc;
+        padding: 20px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        background-color: #c4d9d4;
+      }
+      #locker-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 20px;
+      }
+      #locker {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.3);
+        border: 2px dashed rgba(255, 255, 255, 0.6);
+      }
+
+      .saved-item {
+        position: absolute;
+        width: 100px;
+        height: 100px;
+        padding: 10px;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: grab;
+        transform-origin: center center;
+      }
+      .saved-item img {
+        max-width: 100%;
+        max-height: 100%;
+        pointer-events: none;
+      }
+
+      .locker-label {
+        position: absolute;
+        top: -15px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #fffacd;
+        border: 1px solid #d4c879;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        color: #333;
+        font-weight: bold;
+        white-space: nowrap;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        pointer-events: none;
+        z-index: 10;
+      }
+
+      #trash-bin {
+        height: 80px;
+        background-color: transparent;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        border: 2px dashed transparent;
+      }
+      #trash-bin.drag-over {
+        background-color: rgba(255, 0, 0, 0.1);
+        border-color: #ff4c4c;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      function startDrag(event, type, value, fbKey) {
+        event.dataTransfer.setData("type", type);
+        event.dataTransfer.setData("value", value);
+        if (fbKey) event.dataTransfer.setData("fbKey", fbKey);
+      }
+    </script>
+
+    <div id="left-panel">
+      <div id="app-title-bar">
+        <h1>Capture to Memo!</h1>
+      </div>
+      <div
+        id="incoming-list"
+        style="
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          flex: 1;
+          overflow-y: auto;
+        "
+      ></div>
+    </div>
+
+    <div id="center-panel">
+      <div id="canvas-container"></div>
+
+      <div id="deco-modal">
+        <div class="modal-content">
+          <div class="modal-left">
+            <input
+              type="text"
+              id="memo-input"
+              placeholder="상단 라벨 텍스트 입력"
+              style="width: 260px"
+            />
+
+            <div id="popup-workspace">
+              <img id="popup-preview-img" src="" alt="사물 이미지" />
+            </div>
+
+            <div class="sticker-container">
+              <div class="sticker-btn" onclick="addPopupSticker('rect')">
+                ■ 네모
+              </div>
+              <div class="sticker-btn" onclick="addPopupSticker('triangle')">
+                ▲ 세모
+              </div>
+              <div class="sticker-btn" onclick="addPopupSticker('circle')">
+                ● 동그라미
+              </div>
+            </div>
+            <button id="fix-btn" onclick="fixAndMerge()">🔒 꾸미기 완료</button>
+          </div>
+          <div class="modal-right">
+            <label style="font-size: 0.85rem; font-weight: bold; color: #555"
+              >📝 상세 메모 (장문)</label
+            >
+            <textarea
+              id="long-memo-input"
+              placeholder="이 사물에 대한 이야기를 자유롭게 적어보세요..."
+            ></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="right-panel">
+      <div id="locker-container">
+        <div id="locker"></div>
+      </div>
+      <div id="trash-bin">
+        <img
+          src="Trash.png"
+          alt="휴지통"
+          style="width: 60px; height: 60px; pointer-events: none"
+        />
+      </div>
+    </div>
+
+    <script src="sketch.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyCr5rtPZ6u8eqlXvBoyjm3RAerOYYiL44",
+        authDomain: "interactivememo.firebaseapp.com",
+        databaseURL: "https://interactivememo-default-rtdb.firebaseio.com",
+        projectId: "interactivememo",
+        storageBucket: "interactivememo.appspot.com",
+        messagingSenderId: "244477022912",
+        appId: "1:244477022912:web:7fa3461abc1c752e345325",
+        measurementId: "G-KBN8K062ZR",
+      };
+      firebase.initializeApp(firebaseConfig);
+      window.db = firebase.database();
+
+      window.db.ref("incoming").on("child_added", (snapshot) => {
+        const data = snapshot.val();
+        const fbKey = snapshot.key;
+        const incomingList = document.getElementById("incoming-list");
+
+        const box = document.createElement("div");
+        box.className = "phone-box";
+        box.id = fbKey;
+        box.draggable = true;
+
+        const img = document.createElement("img");
+        img.src = data.image;
+        box.appendChild(img);
+
+        box.ondragstart = function (event) {
+          startDrag(event, "main", data.image, fbKey);
+        };
+        incomingList.prepend(box);
+      });
+    </script>
+  </body>
+</html>
