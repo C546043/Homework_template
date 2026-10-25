@@ -1,2045 +1,403 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width,initial-scale=1,viewport-fit=cover"
-    />
-    <title>Capture to Memo — Archive Studio</title>
-    <style>
-      :root {
-        --blue: #1649f5;
-        --ink: #182340;
-        --muted: #858fa4;
-        --line: rgba(24, 35, 64, 0.12);
-        --paper: #fbfcff;
-        --shade: #f0f3f9;
-      }
-      * {
-        box-sizing: border-box;
-      }
-      html,
-      body {
-        margin: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        font-family: Arial, "Malgun Gothic", sans-serif;
-        color: var(--ink);
-        background: #f7f9fd;
-      }
-      button,
-      input {
-        font: inherit;
-      }
-      button {
-        cursor: pointer;
-      }
-      button:disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
-      }
-      button:focus-visible,
-      input:focus-visible,
-      [contenteditable]:focus-visible {
-        outline: 2px solid var(--blue);
-        outline-offset: 3px;
-      }
-      button {
-        border: 0;
-      }
-      [hidden] {
-        display: none !important;
-      }
-      /* 공간 A: 표지와 인화실을 하나의 가로 공간으로 */
-      #world {
-        position: fixed;
-        inset: 0;
-        overflow: hidden;
-        touch-action: pan-y;
-      }
-      #world-track {
-        display: flex;
-        width: 200vw;
-        height: 100%;
-        transform: translateX(0);
-        transition: transform 0.82s cubic-bezier(0.21, 0.92, 0.22, 1);
-      }
-      body.in-darkroom #world-track {
-        transform: translateX(-100vw);
-      }
-      .world-page {
-        position: relative;
-        width: 100vw;
-        height: 100%;
-        flex: 0 0 100vw;
-        overflow: hidden;
-        background: linear-gradient(135deg, #fff 0%, #f8faff 58%, #eff4ff 100%);
-      }
-      .world-page:before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background-image: linear-gradient(
-          to right,
-          rgba(27, 75, 165, 0.035) 1px,
-          transparent 1px
-        );
-        background-size: 20vw 100%;
-        pointer-events: none;
-      }
-      .micro {
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 0.2em;
-        text-transform: uppercase;
-      }
-      .brand-mark {
-        position: absolute;
-        top: 30px;
-        left: 4vw;
-        z-index: 3;
-        display: flex;
-        gap: 10px;
-        align-items: center;
-      }
-      .brand-bubble {
-        width: 25px;
-        height: 25px;
-        border: 6px solid var(--blue);
-        border-radius: 50%;
-        box-shadow: inset 0 0 0 3px white;
-      }
-      .quiet-right {
-        position: absolute;
-        right: 4vw;
-        top: 35px;
-        color: var(--muted);
-      }
-      /* 표지 */
-      #cover-title {
-        position: absolute;
-        z-index: 3;
-        top: 24%;
-        left: 7vw;
-        pointer-events: none;
-      }
-      #cover-title h1 {
-        font-size: clamp(70px, 10vw, 190px);
-        line-height: 0.88;
-        letter-spacing: -0.092em;
-        margin: 24px 0;
-        color: #172642;
-        font-weight: 900;
-      }
-      #cover-title h1 span {
-        color: var(--blue);
-      }
-      #cover-title p {
-        font-size: clamp(13px, 1.2vw, 18px);
-        line-height: 1.7;
-        color: #62708a;
-        margin-top: 30px;
-      }
-      #cover-title .eyebrow {
-        color: var(--blue);
-        display: flex;
-        gap: 14px;
-        align-items: center;
-      }
-      .eyebrow:before {
-        content: "";
-        height: 2px;
-        width: 42px;
-        background: var(--blue);
-      }
-      /* 떠다니는 앨범 오브젝트: CSS 3D, 외부 이미지 불필요 */
-      .floating-scene {
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        perspective: 1000px;
-      }
-      .floating-book {
-        position: absolute;
-        border-radius: 5px 14px 14px 5px;
-        background: linear-gradient(
-          118deg,
-          rgba(255, 255, 255, 0.95),
-          rgba(217, 228, 255, 0.78) 67%,
-          rgba(153, 183, 255, 0.67)
-        );
-        border: 1px solid rgba(255, 255, 255, 0.9);
-        box-shadow:
-          24px 35px 55px rgba(28, 70, 144, 0.14),
-          inset -13px 0 20px rgba(46, 100, 226, 0.12),
-          inset 3px 0 2px white;
-        transform-style: preserve-3d;
-        animation: floatBook 7s ease-in-out infinite alternate;
-      }
-      .floating-book:before {
-        content: "";
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 10%;
-        width: 2px;
-        background: rgba(30, 70, 160, 0.17);
-      }
-      .floating-book:after {
-        content: "";
-        position: absolute;
-        top: 15%;
-        right: 14%;
-        width: 35%;
-        aspect-ratio: 1;
-        border-radius: 50%;
-        background: radial-gradient(
-          circle at 27% 20%,
-          #fff,
-          #a3c5ff 35%,
-          #2458f7 78%,
-          #1733ac
-        );
-        filter: blur(0.5px);
-      }
-      .floating-book.b1 {
-        width: 190px;
-        height: 255px;
-        right: 18%;
-        top: 12%;
-        transform: rotate(-18deg) rotateY(-32deg);
-        animation-delay: -2s;
-      }
-      .floating-book.b2 {
-        width: 160px;
-        height: 210px;
-        right: 6%;
-        top: 44%;
-        transform: rotate(23deg) rotateY(31deg);
-        background: linear-gradient(110deg, #fff, #f2f3f7, #d3d8e7);
-        animation-delay: -4s;
-      }
-      .floating-book.b3 {
-        width: 125px;
-        height: 170px;
-        right: 34%;
-        top: 56%;
-        transform: rotate(15deg) rotateY(-23deg);
-        animation-delay: -1s;
-      }
-      .glass-orb {
-        position: absolute;
-        border-radius: 50%;
-        border: 1px solid rgba(255, 255, 255, 0.8);
-        background: radial-gradient(
-          circle at 27% 18%,
-          white 1%,
-          rgba(188, 218, 255, 0.4) 22%,
-          rgba(42, 95, 237, 0.65) 67%,
-          rgba(255, 255, 255, 0.3) 100%
-        );
-        box-shadow:
-          inset -9px -10px 20px rgba(0, 40, 174, 0.17),
-          10px 20px 40px rgba(27, 70, 165, 0.12);
-        animation: floatBook 8s ease-in-out infinite alternate;
-      }
-      .orb1 {
-        width: 112px;
-        height: 112px;
-        right: 36%;
-        top: 16%;
-      }
-      .orb2 {
-        width: 65px;
-        height: 65px;
-        right: 12%;
-        bottom: 11%;
-        animation-delay: -2s;
-      }
-      .wire-orbit {
-        position: absolute;
-        width: 400px;
-        height: 190px;
-        border: 1px solid rgba(29, 65, 170, 0.24);
-        border-radius: 50%;
-        right: 5%;
-        top: 26%;
-        transform: rotate(-27deg);
-      }
-      @keyframes floatBook {
-        to {
-          translate: 0 -22px;
-        }
-      }
-      .cover-controls {
-        position: absolute;
-        z-index: 5;
-        bottom: 12%;
-        left: 7vw;
-        display: flex;
-        gap: 10px;
-        align-items: center;
-      }
-      .pill {
-        background: #fff;
-        border: 1px solid var(--line);
-        border-radius: 100px;
-        padding: 14px 19px;
-        color: var(--ink);
-        font-size: 13px;
-        font-weight: 800;
-        box-shadow: 0 8px 20px rgba(45, 73, 117, 0.05);
-      }
-      .pill.primary {
-        background: var(--blue);
-        color: white;
-        border-color: var(--blue);
-      }
-      .slide-hint {
-        position: absolute;
-        right: 5%;
-        bottom: 11%;
-        color: #6f7e99;
-        display: flex;
-        gap: 14px;
-        align-items: center;
-        font-size: 12px;
-        letter-spacing: 0.08em;
-      }
-      .slide-hint b {
-        font-size: 32px;
-        color: var(--blue);
-        font-weight: 400;
-      }
-      .side-nav {
-        position: absolute;
-        z-index: 7;
-        top: 50%;
-        transform: translateY(-50%);
-        padding: 18px 14px;
-        background: rgba(255, 255, 255, 0.82);
-        backdrop-filter: blur(12px);
-        box-shadow: 0 10px 30px rgba(30, 60, 110, 0.09);
-        border: 1px solid rgba(255, 255, 255, 0.9);
-        color: var(--blue);
-        font-weight: 800;
-      }
-      .side-nav.next {
-        right: 0;
-        border-radius: 16px 0 0 16px;
-      }
-      .side-nav.prev {
-        left: 0;
-        border-radius: 0 16px 16px 0;
-      }
-      /* 인화실 */
-      .darkroom-head {
-        position: absolute;
-        z-index: 3;
-        top: 12%;
-        left: 8%;
-        right: 9%;
-      }
-      .darkroom-head h2 {
-        font-size: clamp(42px, 6vw, 96px);
-        margin: 14px 0 8px;
-        letter-spacing: -0.075em;
-      }
-      .darkroom-head p {
-        color: #778399;
-        font-size: 14px;
-      }
-      .darkroom-label {
-        color: var(--blue);
-      }
-      .room-counter {
-        position: absolute;
-        right: 9%;
-        top: 17%;
-        font-weight: 800;
-        font-size: 13px;
-      }
-      .hanging-area {
-        position: absolute;
-        left: 7%;
-        right: 6%;
-        top: 34%;
-        bottom: 14%;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        overflow-x: auto;
-        overflow-y: hidden;
-        scrollbar-width: thin;
-      }
-      .photo-line {
-        position: relative;
-        display: flex;
-        align-items: flex-start;
-        gap: 25px;
-        flex: 1;
-        min-height: 180px;
-        padding: 27px 26px 5px;
-        isolation: isolate;
-      }
-      .photo-line:before {
-        content: "";
-        position: absolute;
-        top: 23px;
-        left: 0;
-        right: 0;
-        min-width: 100%;
-        border-top: 2px solid #b5c1d8;
-        box-shadow: 0 3px 2px white;
-        z-index: -1;
-      }
-      .polaroid {
-        position: relative;
-        flex: 0 0 auto;
-        width: clamp(125px, 11vw, 174px);
-        height: clamp(145px, 14vw, 200px);
-        padding: 9px 9px 27px;
-        background: #fff;
-        border: 1px solid #e6e8ec;
-        box-shadow: 0 12px 26px rgba(27, 50, 90, 0.16);
-        transform: rotate(var(--tilt, 2deg));
-        transition:
-          transform 0.23s,
-          opacity 0.2s;
-        touch-action: pan-y;
-      }
-      .polaroid:hover {
-        transform: rotate(0deg) translateY(-7px);
-      }
-      .polaroid:before {
-        content: "";
-        position: absolute;
-        width: 14px;
-        height: 27px;
-        left: calc(50% - 7px);
-        top: -21px;
-        background: linear-gradient(90deg, #c1c8d1, #fff, #97a9c6);
-        border: 1px solid #a6b3c8;
-        border-radius: 3px;
-        box-shadow: 0 2px 2px #97a9c6;
-        z-index: 3;
-      }
-      .polaroid img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-        background: #e9edf4;
-        pointer-events: none;
-      }
-      .polaroid-label {
-        position: absolute;
-        left: 10px;
-        bottom: 6px;
-        font-size: 10px;
-        color: #536481;
-        white-space: nowrap;
-      }
-      .room-empty {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        text-align: center;
-        color: #9aa5ba;
-        line-height: 1.8;
-        pointer-events: none;
-      }
-      /* 보관함: 아래에서 위로 열리는 별도 공간 */
-      #archive-tab {
-        position: fixed;
-        z-index: 15;
-        left: 50%;
-        bottom: 0;
-        transform: translateX(-50%);
-        min-width: 232px;
-        padding: 12px 20px 15px;
-        border-radius: 17px 17px 0 0;
-        background: var(--blue);
-        color: #fff;
-        box-shadow: 0 -8px 28px rgba(35, 70, 190, 0.12);
-        font-weight: 800;
-        letter-spacing: 0.06em;
-        touch-action: none;
-      }
-      #archive-tab:before {
-        content: "";
-        display: block;
-        width: 42px;
-        height: 4px;
-        background: #c8d7ff;
-        border-radius: 8px;
-        margin: 0 auto 10px;
-      }
-      #archive-sheet {
-        position: fixed;
-        z-index: 20;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        height: 96dvh;
-        border-radius: 26px 26px 0 0;
-        background: linear-gradient(145deg, #fff, #f0f4ff);
-        box-shadow: 0 -20px 90px rgba(13, 39, 101, 0.22);
-        transform: translateY(104%);
-        transition: transform 0.82s cubic-bezier(0.21, 0.92, 0.22, 1);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        touch-action: pan-y;
-      }
-      body.archive-open #archive-sheet {
-        transform: translateY(0);
-      }
-      .archive-header {
-        padding: 13px 5% 18px;
-        border-bottom: 1px solid var(--line);
-        flex: 0 0 auto;
-      }
-      .archive-grip {
-        width: 65px;
-        height: 5px;
-        background: #b8c6e1;
-        border-radius: 8px;
-        display: block;
-        margin: 0 auto 20px;
-        touch-action: none;
-      }
-      .archive-titlebar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-      }
-      .archive-titlebar h2 {
-        font-size: clamp(32px, 4vw, 62px);
-        line-height: 1;
-        letter-spacing: -0.065em;
-        margin: 10px 0;
-      }
-      .archive-titlebar p {
-        color: var(--muted);
-        font-size: 12px;
-      }
-      .archive-close {
-        background: #fff;
-        border: 1px solid var(--line);
-        padding: 12px 17px;
-        border-radius: 100px;
-        color: var(--blue);
-        font-weight: 800;
-      }
-      .archive-tools {
-        display: flex;
-        gap: 9px;
-        flex-wrap: wrap;
-        align-items: center;
-      }
-      .archive-tools input {
-        padding: 10px 12px;
-        min-height: 40px;
-        background: white;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        max-width: 200px;
-      }
-      .archive-tools button {
-        min-height: 40px;
-        padding: 10px 14px;
-        border-radius: 10px;
-        background: #e5edff;
-        color: #1744bc;
-        font-weight: 800;
-      }
-      .archive-rail {
-        display: flex;
-        align-items: stretch;
-        gap: 50px;
-        flex: 1;
-        overflow-x: auto;
-        overflow-y: hidden;
-        scroll-snap-type: x mandatory;
-        padding: 34px max(5%, 25px) 24px;
-        scrollbar-width: thin;
-      }
-      .album-card {
-        flex: 0 0 min(910px, 86vw);
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        scroll-snap-align: center;
-        cursor: pointer;
-        transition: transform 0.3s;
-      }
-      .album-card:nth-child(even) {
-        translate: 0 12px;
-      }
-      .album-card:hover {
-        transform: translateY(-6px);
-      }
-      .album-caption {
-        display: flex;
-        justify-content: space-between;
-        gap: 15px;
-        align-items: center;
-        font-size: 11px;
-        color: #6b7690;
-        letter-spacing: 0.13em;
-      }
-      .album-spread {
-        height: 100%;
-        min-height: 0;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        border: 1px solid #e6e6df;
-        border-radius: 5px 16px 16px 5px;
-        box-shadow:
-          17px 23px 36px rgba(22, 46, 104, 0.16),
-          inset -8px 0 12px rgba(40, 66, 133, 0.05);
-        background: #fcfcf8;
-        overflow: hidden;
-        position: relative;
-      }
-      .album-spread:after {
-        content: "";
-        position: absolute;
-        left: calc(50% - 7px);
-        top: 0;
-        bottom: 0;
-        width: 14px;
-        background: linear-gradient(
-          90deg,
-          rgba(60, 62, 87, 0.14),
-          rgba(255, 255, 255, 0.7),
-          rgba(60, 62, 87, 0.09)
-        );
-        pointer-events: none;
-      }
-      .album-page {
-        min-width: 0;
-        min-height: 0;
-        padding: 22px 20px;
-        background: linear-gradient(100deg, #fefdfa, #f9f9f6);
-        overflow: auto;
-      }
-      .album-page + .album-page {
-        border-left: 1px solid #d6d6d2;
-        background: linear-gradient(90deg, #faf9f5, #fffef9);
-      }
-      .page-date {
-        font-size: 12px;
-        letter-spacing: 0.14em;
-        font-weight: 800;
-        margin: 0 0 12px;
-        color: #53627b;
-      }
-      .album-grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        grid-auto-rows: 66px;
-        grid-auto-flow: dense;
-        gap: 8px;
-      }
-      .album-photo {
-        position: relative;
-        background: #edf0f5;
-        padding: 5px;
-        min-width: 0;
-        min-height: 0;
-        border: 1px solid #e1e3e8;
-        box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.07);
-        grid-column: span 2;
-        grid-row: span 2;
-      }
-      .album-photo.portrait {
-        grid-column: span 2;
-        grid-row: span 3;
-      }
-      .album-photo.landscape {
-        grid-column: span 3;
-        grid-row: span 2;
-      }
-      .album-photo img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-        pointer-events: none;
-      }
-      .album-photo:after {
-        content: attr(data-date);
-        position: absolute;
-        bottom: 5px;
-        left: 7px;
-        padding: 2px 4px;
-        background: rgba(255, 255, 255, 0.83);
-        color: #68748a;
-        font-size: 9px;
-      }
-      .page-empty {
-        color: #b0b5bf;
-        font-style: italic;
-        font-size: 14px;
-        margin: 45px 0;
-        text-align: center;
-      }
-      .album-cover {
-        display: none;
-        height: 100%;
-        min-height: 0;
-        border-radius: 7px 19px 19px 7px;
-        background: linear-gradient(130deg, #e9efff, #fff 35%, #c8d6ff 100%);
-        border-left: 16px solid #1649f5;
-        box-shadow: 17px 23px 36px rgba(22, 46, 104, 0.16);
-        padding: 12%;
-        position: relative;
-        flex-direction: column;
-        justify-content: space-between;
-      }
-      .album-cover:after {
-        content: "";
-        position: absolute;
-        width: 40%;
-        aspect-ratio: 1;
-        right: 8%;
-        top: 18%;
-        border-radius: 50%;
-        background: radial-gradient(
-          circle at 25% 20%,
-          white,
-          #91b8ff 36%,
-          #1b56f1 76%,
-          #071e86
-        );
-        opacity: 0.85;
-      }
-      .album-cover h3 {
-        font-size: clamp(34px, 4vw, 70px);
-        line-height: 0.92;
-        letter-spacing: -0.08em;
-        margin: 0;
-        position: relative;
-        z-index: 1;
-      }
-      .album-cover p {
-        font-size: 14px;
-        font-weight: 700;
-        letter-spacing: 0.12em;
-        position: relative;
-        z-index: 1;
-      }
-      .album-card.closed .album-spread {
-        display: none;
-      }
-      .album-card.closed .album-cover {
-        display: flex;
-      }
-      .archive-empty {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-direction: column;
-        gap: 12px;
-        color: #8190ab;
-        text-align: center;
-      }
-      .memory-pill {
-        margin-left: auto;
-        font-size: 12px;
-        background: #fff;
-        border: 1px solid var(--line);
-        padding: 9px 12px;
-        border-radius: 13px;
-        color: #536481;
-        cursor: pointer;
-        max-width: min(400px, 100%);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      /* 다중 선택 */
-      body.batch-mode .polaroid,
-      body.batch-mode .album-photo {
-        opacity: 0.38;
-      }
-      body.batch-mode .polaroid.selected,
-      body.batch-mode .album-photo.selected {
-        opacity: 1;
-        outline: 3px solid var(--blue);
-        outline-offset: 3px;
-      }
-      .selection-check {
-        display: none;
-        position: absolute;
-        z-index: 3;
-        inset: 0;
-        place-items: center;
-        color: white;
-        font-size: 36px;
-        text-shadow: 0 1px 15px #0525a9;
-        pointer-events: none;
-      }
-      body.batch-mode .selected .selection-check {
-        display: grid;
-      }
-      #batch-bar {
-        position: fixed;
-        z-index: 45;
-        left: 50%;
-        bottom: 15px;
-        transform: translateX(-50%);
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-        justify-content: center;
-        background: #fff;
-        border: 1px solid var(--line);
-        padding: 11px 15px;
-        border-radius: 18px;
-        box-shadow: 0 15px 45px #1b3b752e;
-      }
-      #batch-bar button {
-        background: #edf1ff;
-        padding: 9px 12px;
-        border-radius: 9px;
-        color: #2444a5;
-        font-weight: 800;
-      }
-      #batch-bar .danger {
-        color: white;
-        background: #d94c5f;
-      }
-      /* 메모 편집 및 팝업 */
-      .overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(18, 34, 66, 0.42);
-        z-index: 60;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 15px;
-        backdrop-filter: blur(9px);
-      }
-      .dialog {
-        width: min(620px, 98vw);
-        max-height: calc(var(--visual-height, 100dvh) - 24px);
-        overflow: auto;
-        background: white;
-        border-radius: 20px;
-        padding: 24px;
-        box-shadow: 0 30px 90px rgba(10, 25, 55, 0.24);
-      }
-      .dialog h3 {
-        font-size: 24px;
-        letter-spacing: -0.04em;
-        margin: 0;
-      }
-      .dialog .sub {
-        color: #768198;
-        font-size: 13px;
-      }
-      .dialog-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        margin-bottom: 18px;
-      }
-      .dialog-head button {
-        background: #f1f4fb;
-        padding: 9px 13px;
-        border-radius: 12px;
-        color: #1838ac;
-      }
-      .edit-image {
-        display: block;
-        width: 100%;
-        height: min(33dvh, 285px);
-        object-fit: contain;
-        background: #eef1f8;
-        border-radius: 13px;
-        cursor: zoom-in;
-        margin: 14px 0;
-      }
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: 7px;
-        margin: 12px 0;
-      }
-      .field label {
-        font-weight: 800;
-        font-size: 12px;
-        color: #53627b;
-      }
-      .field input {
-        border: 1px solid #d9dfec;
-        background: #fbfcff;
-        border-radius: 10px;
-        padding: 12px;
-        font-size: 16px;
-      }
-      .format-tools {
-        display: flex;
-        gap: 6px;
-        align-items: center;
-        flex-wrap: wrap;
-        margin: 12px 0;
-        padding: 9px;
-        background: #f4f6fb;
-        border-radius: 10px;
-      }
-      .format-tools button {
-        background: white;
-        border: 1px solid #dde3ef;
-        color: #233354;
-        padding: 7px 10px;
-        min-height: 36px;
-        border-radius: 7px;
-        font-size: 12px;
-        font-weight: 800;
-      }
-      .format-tools button[data-color] {
-        background: var(--tone);
-        width: 27px;
-        height: 27px;
-        border-radius: 50%;
-        padding: 0;
-        min-height: 0;
-      }
-      .rich-editor {
-        min-height: 145px;
-        border: 1px solid #dae0eb;
-        padding: 14px;
-        border-radius: 11px;
-        outline: none;
-        line-height: 1.7;
-        white-space: pre-wrap;
-        overflow-wrap: anywhere;
-        font-size: 16px;
-      }
-      .rich-editor:empty:before {
-        content: attr(data-placeholder);
-        color: #b0b7c6;
-      }
-      .rich-editor .memo-task {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-      }
-      .rich-editor .memo-task input {
-        width: 17px;
-        height: 17px;
-        margin-top: 5px;
-        accent-color: var(--blue);
-      }
-      .rich-editor .memo-task span {
-        flex: 1;
-        min-width: 0;
-        outline: none;
-      }
-      .rich-editor .memo-task input:checked + span {
-        text-decoration: line-through;
-        color: #9ba3b2;
-      }
-      .dialog-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-        margin-top: 18px;
-      }
-      .dialog-actions button {
-        padding: 12px 17px;
-        border-radius: 10px;
-        background: #eaf0ff;
-        color: #1742cb;
-        font-weight: 800;
-      }
-      .dialog-actions .solid {
-        background: var(--blue);
-        color: white;
-      }
-      .dialog-actions .danger {
-        background: #db4960;
-        color: white;
-      }
-      .date-combined {
-        display: flex;
-        border: 1px solid #d9dfec;
-        border-radius: 10px;
-        overflow: hidden;
-        height: 48px;
-        position: relative;
-      }
-      .date-combined .date-display {
-        position: absolute;
-        left: 12px;
-        top: 0;
-        bottom: 0;
-        display: flex;
-        align-items: center;
-        letter-spacing: 0.04em;
-        font: 700 18px monospace;
-        pointer-events: none;
-      }
-      .date-display .ghost {
-        color: #b4bed0;
-      }
-      .date-combined .masked-date {
-        border: 0;
-        background: transparent;
-        color: transparent;
-        -webkit-text-fill-color: transparent;
-        caret-color: transparent;
-        z-index: 1;
-        flex: 1;
-        min-width: 0;
-        font: 18px monospace;
-        padding: 0 12px;
-      }
-      .picker-wrap {
-        position: relative;
-        flex: 0 0 50px;
-        background: #eaf0ff;
-        display: grid;
-        place-items: center;
-        color: var(--blue);
-      }
-      .picker-wrap input[type="date"] {
-        position: absolute;
-        inset: 0;
-        opacity: 0.02;
-        width: 100%;
-        height: 100%;
-        cursor: pointer;
-      }
-      .picker-wrap input::-webkit-calendar-picker-indicator {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        opacity: 0;
-      }
-      .dialog .error {
-        color: #b83d51;
-        font-size: 12px;
-        margin: 10px 0;
-      }
-      .viewer {
-        z-index: 90;
-        background: rgba(5, 11, 27, 0.96);
-      }
-      .viewer img {
-        max-width: 96vw;
-        max-height: 94dvh;
-        object-fit: contain;
-      }
-      .viewer button {
-        position: absolute;
-        top: 24px;
-        right: 24px;
-        background: #fff;
-        color: #172642;
-        padding: 10px 16px;
-        border-radius: 10px;
-      }
-      #toast {
-        position: fixed;
-        z-index: 150;
-        top: 18px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #162957;
-        color: white;
-        padding: 12px 18px;
-        border-radius: 12px;
-        box-shadow: 0 12px 30px #0003;
-        font-size: 13px;
-      }
-      @media (max-width: 760px) {
-        #cover-title {
-          top: 24%;
-          left: 6vw;
-        }
-        #cover-title h1 {
-          font-size: clamp(58px, 13vw, 100px);
-        }
-        .floating-book.b1 {
-          right: -3%;
-          top: 12%;
-          opacity: 0.55;
-        }
-        .floating-book.b2 {
-          right: -7%;
-          top: 58%;
-          opacity: 0.55;
-        }
-        .floating-book.b3 {
-          right: 5%;
-          top: 48%;
-          opacity: 0.5;
-        }
-        .glass-orb {
-          opacity: 0.6;
-        }
-        .cover-controls {
-          bottom: 18%;
-          left: 6vw;
-        }
-        .slide-hint {
-          bottom: 9%;
-          right: 7%;
-        }
-        .darkroom-head {
-          top: 12%;
-          left: 9%;
-        }
-        .darkroom-head h2 {
-          font-size: 56px;
-        }
-        .hanging-area {
-          top: 35%;
-          bottom: 17%;
-          left: 5%;
-          right: 5%;
-        }
-        .photo-line {
-          gap: 15px;
-        }
-        .archive-header {
-          padding: 10px 4%;
-        }
-        .archive-titlebar h2 {
-          font-size: 35px;
-        }
-        .archive-tools input {
-          max-width: 140px;
-        }
-        .archive-rail {
-          gap: 20px;
-          padding: 24px 5%;
-        }
-        .album-card {
-          flex-basis: 93vw;
-        }
-        .album-page {
-          padding: 10px 8px;
-        }
-        .album-grid {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          grid-auto-rows: 52px;
-          gap: 5px;
-        }
-        .album-photo.landscape {
-          grid-column: span 3;
-        }
-        .album-photo.portrait {
-          grid-column: span 2;
-        }
-        .page-date {
-          font-size: 9px;
-        }
-        .dialog {
-          padding: 15px;
-        }
-        .format-tools button {
-          padding: 8px;
-        }
-        .memory-pill {
-          max-width: 145px;
-        }
-      }
-      @media (max-height: 570px) {
-        #cover-title {
-          top: 18%;
-        }
-        .cover-controls {
-          bottom: 9%;
-        }
-        .hanging-area {
-          top: 40%;
-          bottom: 12%;
-        }
-        .photo-line {
-          min-height: 140px;
-        }
-        .polaroid {
-          height: 140px;
-          width: 125px;
-        }
-        .archive-rail {
-          padding-top: 12px;
-        }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        *,
-        *:before,
-        *:after {
-          animation-duration: 0.001ms !important;
-          transition-duration: 0.001ms !important;
-        }
-      }
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f9fbff">
+<title>Capture to Memo — Acrylic Album</title>
+<style>
+/* ============================================================
+   CAPTURE TO MEMO  /  ACRYLIC ALBUM EDITION
+   A single, consolidated stylesheet. No pins; no old overrides.
+   ============================================================ */
+:root {
+  --ink:#192444; --muted:#74819e; --blue:#4459ed;
+  --line:rgba(112,140,195,.19); --white:#fff;
+  --bg:#fafcff; --visual-height:100dvh;
+}
+* {box-sizing:border-box}
+html,body {margin:0; width:100%; height:100%; font-family:Inter,Pretendard,Arial,"Apple SD Gothic Neo",sans-serif; color:var(--ink)}
+body {overflow:hidden; background:var(--bg)}
+button,input,select,textarea {font:inherit}
+button {cursor:pointer}
+button:disabled {opacity:.5; cursor:not-allowed}
+button:focus-visible,input:focus-visible,.rich-editor:focus-visible {outline:2px solid #4b65ec;outline-offset:2px}
+[hidden] {display:none!important}
+.micro {font-size:11px; font-weight:800; letter-spacing:.18em}
+/* ------------------------------------------------------------
+   01. CONTINUOUS COVER + DARKROOM WORLD
+   ------------------------------------------------------------ */
+#world {position:relative; z-index:0; width:100vw; height:100dvh; overflow-x:auto; overflow-y:hidden; scroll-snap-type:none; touch-action:pan-x pan-y; overscroll-behavior-x:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch}
+#world::-webkit-scrollbar {display:none}
+#world-track {position:relative; display:flex; width:200vw; height:100%; transform:none!important; transition:none!important;
+  background:radial-gradient(ellipse 31% 47% at 45% 54%,rgba(112,159,255,.14),transparent 70%),
+    radial-gradient(ellipse 26% 65% at 88% 29%,rgba(144,192,245,.12),transparent 70%),
+    linear-gradient(110deg,#fff 0%,#fafbff 42%,#f1f6fc 100%);
+}
+#world-track::before {content:"";position:absolute;inset:0;pointer-events:none;opacity:.52;
+  background:repeating-linear-gradient(90deg,rgba(71,100,158,.10) 0 1px,transparent 1px calc(20vw));}
+.world-page {position:relative; flex:0 0 100vw; min-width:0; height:100%; background:transparent; overflow:hidden; scroll-snap-align:none}
+/* Cover */
+#cover .brand-mark {position:absolute;left:4.2%;top:5%;z-index:9;display:flex;align-items:center;gap:11px;white-space:nowrap}
+.brand-bubble {width:23px;height:23px;border:6px solid var(--blue);border-radius:50%;display:inline-block}
+#cover .quiet-right {position:absolute;right:4%;top:6.8%;z-index:5;color:#848da7;white-space:nowrap}
+.floating-scene {position:absolute;inset:0;z-index:1;pointer-events:none}
+#three-glass-scene {position:absolute;inset:0 0 0 27%;pointer-events:none}
+#three-glass-scene canvas {width:100%;height:100%;display:block;pointer-events:none}
+#cover-title {position:absolute;top:26%;left:6.3%;z-index:5;width:48%;max-width:820px;pointer-events:none}
+.eyebrow {display:flex;align-items:center;gap:14px;color:var(--blue)}
+.eyebrow::before {content:"";width:42px;height:2px;background:var(--blue)}
+#cover-title h1 {font-size:clamp(64px,8.6vw,162px);line-height:.91;letter-spacing:-.083em;font-weight:850;margin:24px 0 32px}
+#cover-title h1 span {color:var(--blue)}
+#cover-title p {font-size:clamp(13px,1.3vw,20px);line-height:1.75;color:#8390a8;font-weight:440;letter-spacing:-.02em}
+.cover-controls {position:absolute;left:6.3%;bottom:11.2%;z-index:12;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.pill {border:1px solid #dbe2f1;border-radius:100px;white-space:nowrap;padding:14px 24px;background:rgba(255,255,255,.87);font-weight:750;font-size:14px;color:#1b2747;box-shadow:0 9px 24px rgba(36,60,125,.07)}
+.pill.primary {color:white;background:var(--blue);border-color:var(--blue)}
+.pill:hover {filter:brightness(.97)}
+/* 3 real photographs: translucent acrylic polaroids. NO pins. */
+#cover-photo-floats {position:absolute;inset:0;z-index:8;pointer-events:none}
+.cover-float-card {position:absolute;display:block;width:clamp(126px,11.6vw,184px);height:auto;aspect-ratio:170/206;padding:10px 10px 30px;border:1px solid rgba(255,255,255,.90);
+  border-radius:11px;overflow:visible;isolation:isolate; background:linear-gradient(132deg,rgba(255,255,255,.79),rgba(226,240,255,.49) 63%,rgba(216,229,255,.65));
+  -webkit-backdrop-filter:blur(18px) saturate(1.35);backdrop-filter:blur(18px) saturate(1.35);
+  box-shadow:inset 2px 2px 2px rgba(255,255,255,.94),inset -2px -3px 12px rgba(80,131,224,.08),0 14px 33px rgba(38,67,127,.16);
+  text-align:left; pointer-events:auto;cursor:pointer; transform-style:preserve-3d;
+  animation:ctmFloat 7s ease-in-out infinite alternate; translate:0 0;
+}
+.cover-float-card::before {content:"";position:absolute;inset:2px;border:1px solid rgba(255,255,255,.44);border-radius:9px;pointer-events:none}
+.cover-float-card img {display:block;width:100%;height:100%;object-fit:cover;object-position:center;background:#e7eef9;border-radius:3px;pointer-events:none}
+.cover-float-label {position:absolute;bottom:8px;left:10px;right:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#647390;font-size:10px;font-weight:800;pointer-events:none}
+.cover-float-card:nth-child(1) {--floatY:12px;animation-duration:7.5s;animation-delay:-1.5s}
+.cover-float-card:nth-child(2) {--floatY:18px;animation-duration:8.8s;animation-delay:-3.4s}
+.cover-float-card:nth-child(3) {--floatY:15px;animation-duration:6.9s;animation-delay:-2.7s}
+@keyframes ctmFloat {from{translate:0 0}to{translate:4px calc(-1 * var(--floatY,12px))}}
+/* ------------------------------------------------------------
+   THE PRINT ROOM — TWO CROSSING WIRES + PHYSICS POLAROIDS
+   앞줄: Firebase 실제 사진 | 뒷줄: 흐린 빈 폴라로이드
+   ------------------------------------------------------------ */
+#world-wire-overlay {position:absolute;inset:0;z-index:1;width:100%;height:100%;pointer-events:none;overflow:visible}
+#world-wire-overlay line {vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-width:1.6}
+#front-wire {stroke:rgba(84,113,177,.48)}
+#rear-wire {stroke:rgba(124,158,194,.24);stroke-width:1.2;filter:blur(.5px)}
+.world-page {z-index:2}
+#darkroom {display:block;overflow:hidden}
+#darkroom-scene {position:absolute;inset:0;width:100%;height:100%;overflow:hidden;isolation:isolate;pointer-events:none}
+#darkroom-scene::before {content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at 65% 45%,rgba(131,173,255,.075),transparent 69%)}
+#rear-deco-layer,#front-photo-layer {position:absolute;inset:0;overflow:visible;pointer-events:none}
+#rear-deco-layer {z-index:1;opacity:.55;filter:blur(1.35px)}
+#front-photo-layer {z-index:3}
+/* Real photos move with the wire; the parent never blocks scrolling. */
+.hanging-polaroid {position:absolute;display:block;width:clamp(112px,10.8vw,169px);aspect-ratio:170/206;
+  padding:9px 9px 30px;margin:0;text-align:left;left:0;top:0;
+  border:1px solid rgba(255,255,255,.94);border-radius:9px;
+  background:linear-gradient(132deg,rgba(255,255,255,.92),rgba(232,240,255,.72));
+  -webkit-backdrop-filter:blur(13px) saturate(1.2);backdrop-filter:blur(13px) saturate(1.2);
+  box-shadow:0 14px 32px rgba(44,70,127,.15),inset 1px 1px 0 rgba(255,255,255,.92);
+  transform-origin:50% 4px;will-change:transform,left,top;
+  pointer-events:auto;cursor:pointer;touch-action:pan-x pan-y;user-select:none;
+}
+.hanging-polaroid img {width:100%;height:100%;object-fit:cover;object-position:center;display:block;border-radius:2px;pointer-events:none}
+.hanging-polaroid .polaroid-label {position:absolute;bottom:8px;left:9px;right:9px;
+  font-size:10px;font-weight:800;color:#7381a3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+/* Clear acrylic clothespin attaches the photo to the sloping wire. */
+.hanging-polaroid .wire-clip {position:absolute;z-index:4;top:-17px;left:50%;width:16px;height:27px;
+  transform:translateX(-50%);border:1px solid rgba(178,212,255,.86);border-radius:4px 4px 5px 5px;
+  background:linear-gradient(90deg,rgba(255,255,255,.87),rgba(155,197,244,.52) 45%,rgba(225,245,255,.75));
+  box-shadow:1px 3px 8px rgba(85,129,190,.13),inset 1px 1px 0 white;pointer-events:none}
+.hanging-polaroid .wire-clip::after {content:"";position:absolute;top:7px;left:7px;height:18px;width:1px;background:rgba(83,127,182,.33)}
+/* Faint empty memories, behind the active line */
+.rear-empty {position:absolute;width:clamp(116px,10vw,155px);aspect-ratio:170/206;
+  padding:9px 9px 29px;left:0;top:0;border-radius:9px;border:1px solid rgba(205,222,245,.44);
+  background:linear-gradient(145deg,rgba(255,255,255,.34),rgba(205,225,250,.18));
+  box-shadow:0 12px 25px rgba(51,88,155,.07);pointer-events:none}
+.rear-empty .rear-empty-photo {height:100%;width:100%;display:block;border-radius:3px;
+  background:linear-gradient(135deg,rgba(223,235,250,.36),rgba(178,208,251,.15));
+  border:1px solid rgba(255,255,255,.28)}
+.rear-empty .wire-clip {position:absolute;top:-15px;left:calc(50% - 6px);width:12px;height:24px;
+  border:1px solid rgba(177,207,246,.5);border-radius:3px;background:rgba(217,234,255,.38)}
+@media (max-width:660px) {
+ .hanging-polaroid {width:clamp(91px,19vw,126px);padding:6px 6px 22px}
+ .hanging-polaroid .polaroid-label {font-size:8px;bottom:5px;left:6px}
+ .rear-empty {width:clamp(87px,17vw,114px)}
+}
+/* archive bottom handle */
+#archive-tab {position:fixed;z-index:25;bottom:0;left:50%;transform:translateX(-50%);min-width:min(400px,80vw);padding:21px 26px 17px;border:1px solid rgba(255,255,255,.95);border-radius:22px 22px 0 0;
+  color:var(--blue);font-size:clamp(13px,1.3vw,20px);font-weight:900;letter-spacing:.06em;white-space:nowrap;
+  background:linear-gradient(125deg,rgba(255,255,255,.83),rgba(216,227,255,.53));
+  box-shadow:0 -9px 25px rgba(47,79,148,.08);backdrop-filter:blur(20px)}
+#archive-tab::before {content:"";position:absolute;top:10px;left:calc(50% - 23px);width:46px;height:4px;border-radius:99px;background:#93a4ed}
+body.archive-open #archive-tab {visibility:hidden}
+/* ------------------------------------------------------------
+   02. THE ARCHIVE — SOLID PAGE, TRANSLUCENT ALBUMS
+   ------------------------------------------------------------ */
+#archive-sheet {position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;height:100dvh;overflow:hidden;
+  transform:translateY(103%);transition:transform .62s cubic-bezier(.2,.8,.18,1);background:
+  radial-gradient(ellipse at 10% 90%,rgba(97,157,248,.22),transparent 48%),
+  radial-gradient(ellipse at 89% 17%,rgba(165,198,247,.21),transparent 49%),
+  linear-gradient(120deg,#f6faff,#ecf3fb);border-radius:0;box-shadow:0 -25px 75px rgba(40,69,116,.15)}
+body.archive-open #archive-sheet {transform:translateY(0)}
+/* Decorative out-of-focus shapes BEHIND the album. These make acrylic translucency readable. */
+#archive-sheet::before {content:"";position:absolute;z-index:0;inset:10% 0 0;pointer-events:none;background:
+  radial-gradient(ellipse 160px 250px at 17% 37%,rgba(99,142,255,.13),transparent 72%),
+  radial-gradient(ellipse 280px 220px at 75% 70%,rgba(143,194,243,.15),transparent 76%);filter:blur(23px)}
+#archive-sheet > * {position:relative;z-index:1}
+.archive-header {flex:0 0 auto;background:rgba(255,255,255,.88);border-bottom:1px solid var(--line);padding:26px clamp(17px,4vw,70px) 12px;backdrop-filter:blur(22px)}
+.archive-grip {position:absolute;top:9px;left:50%;transform:translateX(-50%);border:0;width:60px;height:5px;background:#b7c5e8;border-radius:99px;padding:0}
+.archive-mini-bar {display:flex;align-items:center;justify-content:space-between;gap:16px}
+.archive-brand {font-size:12px;font-weight:900;letter-spacing:.16em;white-space:nowrap;color:#31466c}
+.archive-tools {display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap}
+.archive-tools input {border:1px solid #d4dfef;background:rgba(255,255,255,.95);color:var(--ink);border-radius:9px;height:39px;padding:7px 10px;min-width:0;font-size:13px}
+#archive-search {width:clamp(130px,17vw,250px)}
+#archive-date {width:clamp(128px,13vw,175px)}
+.archive-tools button,.archive-close {height:39px;padding:0 13px;font-weight:800;color:#315cd4;border:1px solid #d5e0f1;border-radius:9px;background:#edf2ff;white-space:nowrap;font-size:13px}
+.archive-close {background:white;flex:0 0 auto}
+.archive-rail {flex:1;display:flex;align-items:center;gap:clamp(44px,6vw,96px);min-height:0;overflow-x:auto;overflow-y:hidden;padding:40px clamp(28px,7vw,112px) 70px;scrollbar-width:none;scroll-snap-type:none;touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch;perspective:1400px}
+.archive-rail::-webkit-scrollbar {display:none}
+.archive-empty {margin:auto;font-size:17px;color:#6d7b97}
+/* Album shell = coloured translucent acrylic cover + layers of clear material */
+.album-card {--album-color:#b9ccef;--album-ink:#20345d;--album-angle:-3deg;position:relative;isolation:isolate;flex:0 0 min(820px,82vw);min-width:0;padding:12px 10px 28px;cursor:pointer;
+  transform:rotate(var(--album-angle)) rotateX(2deg);transform-origin:center;transition:transform .25s ease;touch-action:pan-x pan-y}
+.album-card:hover {transform:rotate(var(--album-angle)) rotateX(2deg) translateY(-3px)}
+.album-card::before {content:"";position:absolute;inset:23px 7px 52px 8px;z-index:0;border-radius:9px 19px 19px 9px;pointer-events:none;
+  background:linear-gradient(130deg,rgba(255,255,255,.64),var(--album-color) 95%);opacity:.72;
+  box-shadow:6px 7px 0 rgba(225,234,247,.85),11px 12px 0 rgba(158,181,225,.25),21px 30px 44px rgba(51,82,141,.15)}
+.album-spread {position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);width:100%;height:clamp(350px,66dvh,645px);padding:8px;border:7px solid transparent;
+  border-image:none;border-radius:9px 18px 18px 9px;
+  background:linear-gradient(120deg,rgba(255,255,255,.83),rgba(184,211,253,.25),rgba(255,255,255,.76)) padding-box,
+    linear-gradient(120deg,rgba(255,255,255,.93),var(--album-color),rgba(255,255,255,.91)) border-box;
+  box-shadow:inset 0 1px 4px rgba(255,255,255,.95),inset 0 -6px 13px rgba(74,114,196,.08),
+    0 3px 0 rgba(255,255,255,.93),0 8px 0 rgba(137,157,201,.14),18px 28px 43px rgba(44,70,124,.18);
+  -webkit-backdrop-filter:blur(17px) saturate(1.25);backdrop-filter:blur(17px) saturate(1.25)}
+/* visible center spine and acrylic binding loops; not photo pins */
+.album-spread::before {content:"";pointer-events:none;position:absolute;z-index:5;top:3px;bottom:3px;left:calc(50% - 14px);width:28px;
+  background:linear-gradient(90deg,rgba(71,100,157,.19),rgba(255,255,255,.75) 52%,rgba(48,75,134,.11));filter:blur(2px)}
+.album-spread::after {content:"";pointer-events:none;position:absolute;z-index:6;top:7%;bottom:7%;left:calc(50% - 19px);width:38px;
+  background:radial-gradient(ellipse 16px 26px at 50% 14%,transparent 54%,rgba(121,145,181,.45) 61%,rgba(252,254,255,.9) 66%,rgba(109,138,180,.34) 73%,transparent 77%),
+    radial-gradient(ellipse 16px 26px at 50% 50%,transparent 54%,rgba(121,145,181,.45) 61%,rgba(252,254,255,.9) 66%,rgba(109,138,180,.34) 73%,transparent 77%),
+    radial-gradient(ellipse 16px 26px at 50% 86%,transparent 54%,rgba(121,145,181,.45) 61%,rgba(252,254,255,.9) 66%,rgba(109,138,180,.34) 73%,transparent 77%)}
+.album-page {min-width:0;min-height:0;position:relative;padding:clamp(14px,2vw,29px);overflow-x:hidden;overflow-y:auto;scrollbar-width:none;
+  color:#273754;background:linear-gradient(120deg,rgba(255,255,255,.77),rgba(244,249,255,.69));
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.98),inset 0 0 23px rgba(105,139,212,.05);backdrop-filter:blur(13px)}
+.album-page:first-child {border-radius:3px 0 0 3px;background:linear-gradient(95deg,rgba(255,255,255,.84),rgba(239,247,255,.74))}
+.album-page:nth-child(2) {border-radius:0 3px 3px 0;background:linear-gradient(95deg,rgba(231,243,255,.74),rgba(255,255,255,.82))}
+.album-page::-webkit-scrollbar {display:none}
+.page-date {margin:0 0 17px;font-size:12px;letter-spacing:.1em;font-weight:900;color:#657694}
+.album-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(11px,1.4vw,20px);align-content:start;padding:6px 4px 26px}
+/* standardized acrylic polaroids: exact same aspect ratio regardless of source photo */
+.album-photo {position:relative;display:block;min-width:0;width:100%;height:auto;aspect-ratio:170/206;padding:8px 8px 26px;border-radius:6px;border:1px solid rgba(255,255,255,.95);
+  background:linear-gradient(140deg,rgba(255,255,255,.85),rgba(237,245,255,.64));
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.94),0 7px 17px rgba(39,69,125,.15);
+  cursor:pointer;transform:rotate(var(--photo-angle,0deg));transition:filter .18s,box-shadow .18s;touch-action:pan-x pan-y}
+.album-photo:hover {filter:brightness(1.03);box-shadow:0 13px 26px rgba(39,69,125,.19);z-index:4}
+.album-photo img {display:block;width:100%;height:100%;object-fit:cover;object-position:center;border-radius:2px;background:#e4ecf9;pointer-events:none}
+.album-photo::after {content:attr(data-date);position:absolute;left:8px;bottom:8px;font-size:10px;font-weight:800;color:#70809e;background:transparent;pointer-events:none}
+/* No ::before pin, no thumbtack SVG/HTML anywhere. */
+.album-caption {margin:23px 10px 0;color:#70819f;font-size:11px;font-weight:900;letter-spacing:.13em}
+.page-empty {font-size:12px;color:#9aa7bb}
+/* Closed acrylic covers */
+.album-cover {display:none;flex-direction:column;justify-content:space-between;position:relative;z-index:1;width:100%;height:clamp(350px,66dvh,645px);padding:9%;overflow:hidden;
+  background:linear-gradient(125deg,rgba(255,255,255,.81),rgba(230,242,255,.33) 48%,var(--album-color));
+  color:var(--album-ink);border:1px solid rgba(255,255,255,.91);border-left:18px solid rgba(92,117,187,.36);border-radius:8px 20px 20px 8px;
+  box-shadow:inset 2px 2px 3px rgba(255,255,255,.94),inset -15px -20px 35px rgba(90,132,222,.09),8px 9px 0 rgba(255,255,255,.7),20px 30px 43px rgba(44,70,124,.20);
+  -webkit-backdrop-filter:blur(24px) saturate(1.35);backdrop-filter:blur(24px) saturate(1.35)}
+.album-cover::after {content:"";position:absolute;right:-16%;top:-22%;width:70%;aspect-ratio:1;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle at 34% 30%,rgba(255,255,255,.91),rgba(196,223,255,.4) 40%,rgba(66,115,224,.17) 75%,transparent);filter:blur(7px)}
+.album-cover-mini {font-size:12px;letter-spacing:.19em;font-weight:900}
+.album-cover-name {font-size:clamp(55px,7vw,100px);font-weight:900;line-height:.84;letter-spacing:-.085em}
+.album-cover-period {font-size:14px;letter-spacing:.06em;font-weight:800}
+.album-card.closed .album-spread {display:none}
+.album-card.closed .album-cover {display:flex}
+/* ------------------------------------------------------------
+   03. EDIT DIALOG, REAL PHOTO (UNCROPPED), TEXT FORMATTING
+   ------------------------------------------------------------ */
+.overlay {position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:18px;
+  background:rgba(15,25,49,.38);backdrop-filter:blur(12px)}
+.dialog {width:min(690px,95vw);max-height:min(calc(var(--visual-height) - 25px),92dvh);overflow-y:auto;overscroll-behavior:contain;padding:22px 25px 30px;
+  border:1px solid rgba(255,255,255,.95);border-radius:20px;background:#fff;box-shadow:0 30px 90px rgba(10,27,69,.30);touch-action:pan-y}
+.dialog-head {display:flex;justify-content:space-between;align-items:center;gap:14px}
+.dialog-head h3 {margin:0;font-size:clamp(19px,2vw,28px);letter-spacing:-.03em}
+.dialog-head button {border:1px solid #dde5f5;border-radius:9px;color:#385bd9;background:#f7faff;padding:10px 13px;white-space:nowrap}
+.dialog .sub {color:#8995ac;font-size:12px;margin:8px 0 20px}
+.field {display:flex;flex-direction:column;gap:8px;margin:14px 0;color:#4d6082;font-size:13px;font-weight:750}
+.field input:not([type=checkbox]), .field textarea {width:100%;min-height:42px;padding:12px 13px;border:1px solid #dae3f2;border-radius:10px;background:#f8faff;color:#23344e}
+.edit-image {display:block;width:100%;height:min(38dvh,390px);max-height:100%;object-fit:contain!important;object-position:center;background:#edf2fb;border-radius:13px;cursor:zoom-in}
+.rich-editor {width:100%;min-height:160px;padding:16px 17px;border:1px solid #dae3f2;border-radius:12px;background:#fbfcff;color:#243756;font-size:16px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;outline:none}
+.rich-editor:empty::before {content:attr(data-placeholder);color:#a4afc2}
+.rich-editor:focus {border-color:#8197f0}
+.memo-task {display:flex;gap:8px;align-items:flex-start;min-height:24px;white-space:normal}
+.memo-task input {flex:0 0 auto;margin:7px 0 0;width:16px;height:16px;accent-color:#5269ea}
+.memo-task span {min-width:0;flex:1;outline:none;white-space:pre-wrap}
+.format-tools {display:flex;flex-wrap:wrap;gap:6px;margin:5px 0 12px}
+.format-tools button {border:1px solid #dbe4f0;background:#f7faff;color:#43557b;border-radius:8px;padding:7px 9px;min-height:35px;font-size:12px;font-weight:800}
+.format-tools button[data-color] {width:28px;min-width:28px;border-radius:50%;padding:4px;background:var(--tone);height:28px;min-height:28px;align-self:center}
+.dialog-actions {display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:22px}
+.dialog-actions button {border:1px solid #d5e0f0;padding:12px 16px;border-radius:10px;background:#f4f7fc;color:#254069;font-weight:800}
+.dialog-actions .solid,.dialog-actions .danger {background:#4760e9;color:white;border-color:#4760e9}
+.dialog-actions .danger {background:#dc4e5a;border-color:#dc4e5a}
+.error {font-size:12px;color:#d94f5b}
+.date-combined {position:relative;display:flex;align-items:center;border:1px solid #d6e1f2;border-radius:9px;background:#f9fbff;min-height:44px;overflow:hidden}
+.date-display {position:absolute;left:13px;top:50%;transform:translateY(-50%);display:flex;letter-spacing:.035em;pointer-events:none;font-weight:650;color:#263d63}
+.date-display .ghost {color:#b0bbcc}
+.masked-date {position:relative;width:calc(100% - 56px)!important;color:transparent!important;caret-color:#5366de;background:transparent!important;border:0!important;box-shadow:none!important;z-index:1;letter-spacing:.035em;font-family:monospace}
+.picker-wrap {position:relative;flex:0 0 52px;text-align:center;display:grid;place-items:center;font-size:23px;color:#506ce6;height:44px}
+.picker-wrap input[type=date] {position:absolute;inset:0;opacity:0;width:100%!important;height:100%;cursor:pointer;z-index:3}
+.viewer {z-index:100;background:rgba(10,13,22,.96);display:flex;align-items:center;justify-content:center;padding:50px 22px 25px}
+.viewer img {width:100%;height:100%;object-fit:contain;user-select:none}
+#viewer-close {position:absolute;right:24px;top:20px;border:1px solid rgba(255,255,255,.34);background:rgba(255,255,255,.12);color:white;padding:12px;border-radius:10px}
+#toast {position:fixed;z-index:150;bottom:95px;left:50%;transform:translateX(-50%);padding:13px 20px;border-radius:100px;background:#203052;color:white;box-shadow:0 9px 26px rgba(0,0,0,.2);font-size:13px;max-width:90vw;text-align:center}
+/* ------------------------------------------------------------
+   04. BULK SELECTION
+   ------------------------------------------------------------ */
+#batch-bar {position:fixed;left:50%;transform:translateX(-50%);bottom:15px;z-index:90;display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:center;
+  max-width:min(95vw,960px);padding:12px 15px;border:1px solid #e0e6f2;border-radius:16px;background:rgba(255,255,255,.96);box-shadow:0 13px 38px rgba(26,51,99,.18);backdrop-filter:blur(15px)}
+#batch-bar strong {font-size:13px;white-space:nowrap;margin-right:10px}
+#batch-bar button {padding:9px 12px;border:1px solid #d6dff0;border-radius:9px;background:#f4f7ff;color:#2e4ab1;font-weight:800}
+#batch-bar .danger {background:#dd5264;color:white;border-color:#dd5264}
+body.batch-mode .polaroid,body.batch-mode .album-photo {opacity:.48}
+body.batch-mode .polaroid.selected,body.batch-mode .album-photo.selected {opacity:1}
+.selection-check {display:none;position:absolute;z-index:12;left:50%;top:50%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;background:#4564e9;color:white;font-size:25px;line-height:44px;text-align:center;box-shadow:0 5px 16px rgba(38,64,139,.27);pointer-events:none}
+body.batch-mode .polaroid.selected .selection-check,body.batch-mode .album-photo.selected .selection-check {display:block}
+/* ------------------------------------------------------------
+   05. RESPONSIVE + REDUCED MOTION
+   ------------------------------------------------------------ */
+@media (max-width:1020px) {
+ #cover-title {left:5.5%;top:29%;width:60%}
+ #cover-title h1 {font-size:clamp(63px,10vw,116px)}
+ #three-glass-scene {left:18%}
+ .archive-mini-bar {flex-wrap:wrap;gap:10px}
+ .archive-tools {order:3;width:100%;justify-content:flex-start}
+ .album-card {flex-basis:90vw}
+ .album-spread,.album-cover {height:clamp(300px,62dvh,580px)}
+ .archive-rail {padding:38px 4vw 65px}
+ .album-grid {gap:10px}
+}
+@media (max-width:660px) {
+ #cover-title {left:6%;top:20%;width:90%}
+ #cover-title h1 {font-size:clamp(55px,13vw,90px)}
+ #cover-title p {font-size:13px}
+ #cover .quiet-right {display:none}
+ #three-glass-scene {left:0;top:15%;height:65%}
+ .cover-controls {left:6%;bottom:9%;gap:8px}
+ .pill {padding:11px 15px;font-size:12px}
+ .cover-float-card {width:115px}
+ .archive-header {padding:26px 12px 12px}
+ .archive-brand {font-size:10px}
+ .archive-tools input {height:36px}
+ #archive-search {width:40vw}
+ #archive-date {width:37vw}
+ .archive-rail {padding:40px 5vw 66px;gap:20px}
+ .album-card {flex-basis:94vw;padding:5px 3px 22px}
+ .album-spread,.album-cover {height:clamp(310px,57dvh,520px)}
+ .album-spread {padding:4px;border-width:4px}
+ .album-page {padding:13px 8px}
+ .page-date {font-size:10px}
+ .album-grid {gap:7px}
+ .album-photo {padding:4px 4px 20px}
+ .album-photo::after {font-size:8px}
+ .dialog {padding:17px 15px}
+}
+@media (prefers-reduced-motion:reduce) {
+ *,*::before,*::after {animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
+</style>
+<!-- Three.js 모듈: glass3d.js와 동일한 버전 사용 -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<main id="world">
+  <div id="world-track">
+    <!-- 한 장의 긴 캔버스에 교차하는 두 줄. 사진은 앞줄에만 걸려요. -->
+    <svg id="world-wire-overlay" aria-hidden="true" preserveAspectRatio="none">
+      <line id="rear-wire" x1="0" y1="0" x2="100" y2="100"></line>
+      <line id="front-wire" x1="0" y1="100" x2="100" y2="0"></line>
+    </svg>
+    <section class="world-page" id="cover" aria-label="시작 화면">
+      <div class="brand-mark micro"><span class="brand-bubble"></span> PHOTO MEMORY STUDIO / VOL.01</div>
+      <div class="quiet-right micro">A PLACE FOR YOUR DAYS · 2026</div>
 
-      /* ===============================================================
-   ALBUM EDITION — 통합 화면 CSS (2026.10)
-   1. 표지 + 인화실 자유 가로 스크롤 / 공통 배경
-   2. 기존 Three.js 책 유지
-   3. 사용자 지정 실제 사진 폴라로이드 3장 + 떠다니기
-   4. 보관함 전체 화면 + 열린 사진 앨범
-================================================================ */
-
-      /* 표지와 인화실을 하나의 긴 자유 스크롤 공간으로 */
-      #world {
-        overflow-x: auto !important;
-        overflow-y: hidden !important;
-        touch-action: pan-x pan-y !important;
-        scroll-snap-type: none !important;
-        overscroll-behavior-x: contain;
-        scrollbar-width: none;
-        -webkit-overflow-scrolling: touch;
-      }
-      #world::-webkit-scrollbar {
-        display: none;
-      }
-      #world-track,
-      body.in-darkroom #world-track {
-        position: relative;
-        transform: none !important;
-        transition: none !important;
-        background: linear-gradient(110deg, #fff 0%, #fafcff 54%, #f3f7ff 100%);
-      }
-      #world .world-page {
-        background: transparent !important;
-        scroll-snap-align: none !important;
-        position: relative;
-      }
-      #world .world-page::before {
-        display: none !important;
-      }
-      #world-track::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background-image: linear-gradient(
-          to right,
-          rgba(27, 75, 165, 0.035) 1px,
-          transparent 1px
-        );
-        background-size: 20vw 100%;
-      }
-
-      /* 메인 실제 3D 책과 포토 카드 서로 분리 */
-      #cover {
-        overflow: hidden;
-      }
-      #cover .floating-scene {
-        position: absolute;
-        inset: 0;
-        z-index: 1;
-        pointer-events: none;
-        overflow: hidden;
-        perspective: none;
-      }
-      #three-glass-scene {
-        position: absolute;
-        top: 0;
-        right: 0;
-        bottom: 0;
-        left: 28%;
-        width: auto;
-        height: 100%;
-        pointer-events: none;
-      }
-      #three-glass-scene canvas {
-        width: 100%;
-        height: 100%;
-        display: block;
-        pointer-events: none;
-      }
-      #cover .floating-book,
-      #cover .floating-book .page {
-        display: none !important;
-      }
-      #cover-title {
-        z-index: 3;
-        pointer-events: none;
-      }
-      #cover .cover-controls {
-        position: absolute !important;
-        left: 7vw !important;
-        bottom: 10% !important;
-        top: auto !important;
-        transform: none !important;
-        z-index: 10;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-
-      /* 편집 가능한 랜덤 실제 사진 폴라로이드 3장 */
-      #cover-photo-floats {
-        position: absolute;
-        inset: 0;
-        z-index: 4;
-        pointer-events: none;
-        perspective: 1100px;
-      }
-      #cover-photo-floats .cover-float-card {
-        position: absolute;
-        width: clamp(118px, 11vw, 180px);
-        aspect-ratio: 0.82;
-        padding: 8px 8px 30px;
-        border: 1px solid rgba(221, 229, 242, 0.98);
-        border-radius: 1px;
-        background: #fff;
-        box-shadow: 0 13px 30px rgba(24, 47, 99, 0.16);
-        color: #697997;
-        text-align: left;
-        overflow: visible;
-        pointer-events: auto;
-        cursor: pointer;
-        transform-style: preserve-3d;
-        transform-origin: center;
-        animation: floatCoverShot 7s ease-in-out infinite alternate;
-        translate: 0 0;
-        rotate: 0deg;
-      }
-      #cover-photo-floats .cover-float-card img {
-        display: block;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        pointer-events: none;
-        user-select: none;
-        background: #eff3fa;
-      }
-      #cover-photo-floats .cover-float-label {
-        position: absolute;
-        bottom: 7px;
-        left: 8px;
-        right: 8px;
-        font-size: 10px;
-        font-weight: 800;
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-        pointer-events: none;
-      }
-      #cover-photo-floats .cover-float-card:nth-child(1) {
-        --float-distance: 13px;
-        --float-rotate: -2deg;
-        animation-duration: 7.5s;
-        animation-delay: -1.5s;
-      }
-      #cover-photo-floats .cover-float-card:nth-child(2) {
-        --float-distance: 19px;
-        --float-rotate: 2deg;
-        animation-duration: 9s;
-        animation-delay: -4s;
-      }
-      #cover-photo-floats .cover-float-card:nth-child(3) {
-        --float-distance: 15px;
-        --float-rotate: -3deg;
-        animation-duration: 6.8s;
-        animation-delay: -2.8s;
-      }
-      @keyframes floatCoverShot {
-        0% {
-          translate: 0 0;
-          rotate: 0deg;
-        }
-        50% {
-          translate: 4px calc(var(--float-distance) * -0.55);
-          rotate: var(--float-rotate);
-        }
-        100% {
-          translate: -3px calc(var(--float-distance) * -1);
-          rotate: 0deg;
-        }
-      }
-
-      /* 인화실 - 불필요한 텍스트가 없는 사진 줄만 */
-      #darkroom .hanging-area {
-        left: 5%;
-        right: 5%;
-        top: 16%;
-        bottom: 13%;
-        gap: clamp(18px, 4vh, 55px);
-        overflow-x: auto;
-      }
-      #darkroom .photo-line {
-        padding-top: 31px;
-        min-height: 160px;
-        touch-action: pan-x pan-y;
-      }
-      #darkroom .photo-line::before {
-        border-top-color: rgba(67, 96, 158, 0.28);
-      }
-      #darkroom .polaroid {
-        touch-action: pan-x pan-y !important;
-      }
-      #darkroom .room-empty,
-      #darkroom .darkroom-head,
-      #darkroom .room-counter,
-      #darkroom .side-nav,
-      #darkroom .brand-mark,
-      #cover .slide-hint,
-      #cover .side-nav {
-        display: none !important;
-      }
-
-      @media (max-width: 900px) {
-        #three-glass-scene {
-          left: 7%;
-          top: 15%;
-          height: 62%;
-        }
-        #cover .cover-controls {
-          left: 5vw !important;
-          bottom: 12% !important;
-        }
-      }
-      @media (max-width: 600px) {
-        #three-glass-scene {
-          left: -4%;
-          top: 16%;
-          right: -5%;
-          height: 56%;
-        }
-        #cover .cover-controls {
-          bottom: 13% !important;
-        }
-        #cover-photo-floats .cover-float-card {
-          width: 130px;
-        }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        #cover-photo-floats .cover-float-card {
-          animation: none !important;
-        }
-      }
-
-      /* =========================================================
-   THE ARCHIVE — OPEN PHOTOBOOKS / REPLACE OLD ARCHIVE UI
-   Place immediately before CSS 종료 태그 (after earlier archive CSS)
-========================================================= */
-
-      /* 01. 완전한 별도 화면: 뒤쪽 메인 페이지가 비치지 않게 */
-      #archive-sheet {
-        top: 0 !important;
-        bottom: 0 !important;
-        height: 100dvh !important;
-        border-radius: 0 !important;
-        background: #e9f0f7 !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        box-shadow: none !important;
-        overflow: hidden;
-      }
-      #archive-sheet::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background:
-          radial-gradient(ellipse at 72% 20%, #f9fbff 0%, transparent 55%),
-          radial-gradient(ellipse at 10% 95%, #dbe6f2 0%, transparent 48%);
-      }
-      #archive-sheet > * {
-        position: relative;
-        z-index: 1;
-      }
-      body.archive-open #archive-tab {
-        visibility: hidden;
-      }
-
-      /* 02. 헤더는 아주 작게. 검색·달력·닫기만 유지 */
-      #archive-sheet .archive-header {
-        flex: 0 0 auto;
-        position: relative;
-        padding: 25px clamp(18px, 4vw, 70px) 12px !important;
-        background: rgba(253, 254, 255, 0.96);
-        border-bottom: 1px solid rgba(54, 83, 128, 0.12);
-        box-shadow: 0 4px 20px rgba(37, 64, 109, 0.025);
-      }
-      #archive-sheet .archive-grip {
-        position: absolute;
-        top: 8px;
-        left: calc(50% - 28px);
-        width: 56px;
-        height: 4px;
-        margin: 0;
-        border-radius: 20px;
-        background: #bac9df;
-        cursor: pointer;
-      }
-      .archive-mini-bar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 18px;
-      }
-      .archive-brand {
-        flex: 0 0 auto;
-        color: #253d64;
-        font-size: 12px;
-        font-weight: 900;
-        letter-spacing: 0.16em;
-        white-space: nowrap;
-      }
-      #archive-sheet .archive-tools {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-left: auto;
-      }
-      #archive-sheet .archive-tools input {
-        width: auto;
-        max-width: none;
-        height: 38px;
-        min-height: 38px;
-        padding: 8px 11px;
-        font-size: 13px;
-        background: #fff;
-        border: 1px solid #d6e0ec;
-        border-radius: 9px;
-      }
-      #archive-sheet #archive-search {
-        width: clamp(130px, 17vw, 250px);
-      }
-      #archive-sheet #archive-date {
-        width: clamp(130px, 13vw, 175px);
-      }
-      #archive-sheet .archive-tools button,
-      #archive-sheet .archive-close {
-        min-height: 38px;
-        padding: 8px 13px;
-        border-radius: 9px;
-        font-size: 13px;
-        font-weight: 800;
-        background: #e8eef9;
-        color: #315bc8;
-        white-space: nowrap;
-      }
-      #archive-sheet .archive-close {
-        flex: 0 0 auto;
-        background: #fff;
-        border: 1px solid #d6e0ec;
-      }
-
-      /* 03. 책들이 넓은 테이블 위에 놓인 듯한 공간 */
-      #archive-sheet .archive-rail {
-        flex: 1 1 auto;
-        display: flex;
-        align-items: center;
-        gap: clamp(42px, 7vw, 125px);
-        padding: 54px clamp(30px, 8vw, 135px) 76px;
-        overflow-x: auto;
-        overflow-y: hidden;
-        scroll-snap-type: none !important;
-        scrollbar-width: none;
-        -webkit-overflow-scrolling: touch;
-      }
-      #archive-sheet .archive-rail::-webkit-scrollbar {
-        display: none;
-      }
-
-      #archive-sheet .album-card {
-        --album-color: #bdcff4;
-        --album-ink: #243858;
-        --album-angle: -3deg;
-        position: relative;
-        isolation: isolate;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        flex: 0 0 min(860px, 83vw);
-        min-width: 0;
-        padding: 18px 12px 28px;
-        scroll-snap-align: none !important;
-        transform: rotate(var(--album-angle)) rotateX(3deg);
-        transform-origin: 50% 50%;
-        transition: transform 0.3s ease;
-        cursor: pointer;
-      }
-      #archive-sheet .album-card:nth-child(even) {
-        translate: none !important;
-      }
-      #archive-sheet .album-card:hover {
-        transform: rotate(var(--album-angle)) rotateX(3deg) translateY(-6px);
-      }
-      /* 앨범 뒷표지: 페이지 바깥에 색상이 보임 */
-      #archive-sheet .album-card::before {
-        content: "";
-        position: absolute;
-        left: 6px;
-        right: 2px;
-        top: 32px;
-        bottom: 60px;
-        z-index: 0;
-        border-radius: 12px 20px 20px 12px;
-        background: var(--album-color);
-        box-shadow: 12px 26px 36px rgba(32, 54, 88, 0.18);
-        transform: translate(7px, 8px) rotate(0.5deg);
-        pointer-events: none;
-      }
-
-      /* 04. 펼친 책: 종이 층 / 가죽·패브릭 표지 / 중앙 링 */
-      #archive-sheet .album-spread {
-        order: 0;
-        position: relative;
-        z-index: 1;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        flex: 0 0 auto;
-        width: 100%;
-        height: clamp(350px, 68dvh, 670px);
-        min-height: 0;
-        padding: 7px;
-        overflow: visible;
-        background: var(--album-color);
-        border: 8px solid var(--album-color);
-        border-radius: 9px 18px 18px 9px;
-        box-shadow:
-          0 3px 0 #e0e3e7,
-          0 6px 0 #cfd4dc,
-          0 10px 0 var(--album-color),
-          16px 28px 38px rgba(30, 48, 75, 0.17);
-      }
-      #archive-sheet .album-spread::before {
-        content: "";
-        position: absolute;
-        z-index: 5;
-        top: 7px;
-        bottom: 7px;
-        left: calc(50% - 14px);
-        width: 28px;
-        background: linear-gradient(
-          90deg,
-          rgba(24, 29, 44, 0.12),
-          rgba(24, 29, 44, 0.04) 28%,
-          rgba(255, 255, 255, 0.65) 50%,
-          rgba(24, 29, 44, 0.06) 72%,
-          rgba(24, 29, 44, 0.12)
-        );
-        pointer-events: none;
-      }
-      /* 제본 링 3개 */
-      #archive-sheet .album-spread::after {
-        content: "";
-        position: absolute;
-        z-index: 6;
-        top: 7%;
-        bottom: 7%;
-        left: calc(50% - 22px);
-        width: 44px;
-        background:
-          radial-gradient(
-            ellipse 19px 29px at 50% 14%,
-            transparent 54%,
-            #667487 58%,
-            #ebf1f7 65%,
-            #9aa5b2 72%,
-            transparent 77%
-          ),
-          radial-gradient(
-            ellipse 19px 29px at 50% 50%,
-            transparent 54%,
-            #667487 58%,
-            #ebf1f7 65%,
-            #9aa5b2 72%,
-            transparent 77%
-          ),
-          radial-gradient(
-            ellipse 19px 29px at 50% 86%,
-            transparent 54%,
-            #667487 58%,
-            #ebf1f7 65%,
-            #9aa5b2 72%,
-            transparent 77%
-          );
-        pointer-events: none;
-      }
-      #archive-sheet .album-page,
-      #archive-sheet .album-page + .album-page {
-        position: relative;
-        min-width: 0;
-        min-height: 0;
-        padding: clamp(15px, 2vw, 29px) clamp(12px, 2vw, 25px);
-        overflow-y: auto;
-        overflow-x: hidden;
-        scrollbar-width: none;
-        background: #fdfcf8;
-        border: 0;
-        border-radius: 3px;
-        color: #28384e;
-      }
-      #archive-sheet .album-page::-webkit-scrollbar {
-        display: none;
-      }
-      #archive-sheet .album-page:first-child {
-        background: linear-gradient(
-          90deg,
-          #faf8f2 0%,
-          #fffefa 84%,
-          #f3f0e9 100%
-        );
-        box-shadow: inset -7px 0 13px rgba(49, 43, 32, 0.06);
-      }
-      #archive-sheet .album-page:nth-child(2) {
-        background: linear-gradient(
-          90deg,
-          #efede7 0%,
-          #fffefa 11%,
-          #fbfaf5 100%
-        );
-        box-shadow: inset 7px 0 13px rgba(49, 43, 32, 0.045);
-      }
-      #archive-sheet .album-card[data-dark="true"] .album-page {
-        color: #eff3f6;
-        background: #25313d;
-        box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.17);
-      }
-      #archive-sheet .page-date {
-        font-size: clamp(10px, 0.78vw, 13px);
-        font-weight: 800;
-        letter-spacing: 0.1em;
-        color: #637189;
-        margin: 0 0 17px;
-      }
-      #archive-sheet .album-card[data-dark="true"] .page-date {
-        color: #d6e0e8;
-      }
-
-      /* 05. 사진: 흰 인화지 + 서로 다른 회전 + 원본 비율 유지 */
-      #archive-sheet .album-grid {
-        display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-        grid-auto-rows: clamp(39px, 6.5dvh, 76px);
-        grid-auto-flow: dense;
-        gap: clamp(7px, 1vw, 13px);
-        padding: 4px 3px 22px;
-      }
-      #archive-sheet .album-photo {
-        position: relative;
-        display: block;
-        grid-column: span 3;
-        grid-row: span 2;
-        min-width: 0;
-        min-height: 0;
-        padding: 7px 7px 23px;
-        overflow: hidden;
-        border: 1px solid #e2e4e7;
-        border-radius: 1px;
-        background: #fff;
-        box-shadow: 0 6px 13px rgba(29, 39, 55, 0.16);
-        transform: rotate(var(--photo-angle, 0deg));
-        transform-origin: 50% 50%;
-        transition:
-          transform 0.2s,
-          box-shadow 0.2s;
-        cursor: pointer;
-      }
-      #archive-sheet .album-photo.landscape {
-        grid-column: span 4;
-        grid-row: span 2;
-      }
-      #archive-sheet .album-photo.portrait {
-        grid-column: span 3;
-        grid-row: span 3;
-      }
-      #archive-sheet .album-photo img {
-        display: block;
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-        background: #f7f8f9;
-        pointer-events: none;
-      }
-      #archive-sheet .album-photo::after {
-        bottom: 4px;
-        left: 7px;
-        padding: 0;
-        background: transparent;
-        color: #8791a0;
-        font-size: 9px;
-      }
-      #archive-sheet .album-photo:hover {
-        z-index: 7;
-        transform: rotate(0deg) translateY(-4px) scale(1.03);
-        box-shadow: 0 12px 22px rgba(29, 39, 55, 0.22);
-      }
-
-      /* 06. 닫힌 책도 실제 표지처럼 */
-      #archive-sheet .album-cover {
-        order: 0;
-        position: relative;
-        z-index: 1;
-        display: none;
-        flex-direction: column;
-        justify-content: space-between;
-        flex: 0 0 auto;
-        width: 100%;
-        height: clamp(350px, 68dvh, 670px);
-        min-height: 0;
-        padding: 10%;
-        overflow: hidden;
-        border: 1px solid rgba(0, 0, 0, 0.04);
-        border-left: 24px solid rgba(20, 36, 61, 0.24);
-        border-radius: 7px 20px 20px 7px;
-        background:
-          linear-gradient(130deg, rgba(255, 255, 255, 0.24), transparent 40%),
-          var(--album-color);
-        color: var(--album-ink);
-        box-shadow:
-          0 7px 0 #e9edf2,
-          0 11px 0 #bdc6d0,
-          20px 32px 38px rgba(32, 54, 88, 0.19);
-      }
-      #archive-sheet .album-cover::after {
-        display: none;
-      }
-      #archive-sheet .album-cover-mini {
-        font-size: 12px;
-        font-weight: 800;
-        letter-spacing: 0.2em;
-      }
-      #archive-sheet .album-cover-name {
-        font-weight: 900;
-        font-size: clamp(55px, 7vw, 105px);
-        letter-spacing: -0.09em;
-        line-height: 0.85;
-      }
-      #archive-sheet .album-cover-period {
-        font-size: 15px;
-        font-weight: 800;
-        letter-spacing: 0.06em;
-      }
-      #archive-sheet .album-card.closed .album-spread {
-        display: none;
-      }
-      #archive-sheet .album-card.closed .album-cover {
-        display: flex;
-      }
-      #archive-sheet .album-caption {
-        order: 2;
-        position: relative;
-        z-index: 2;
-        margin: 23px 10px 0;
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 0.13em;
-        color: #72819a;
-        text-transform: uppercase;
-        justify-content: flex-start;
-      }
-      #archive-sheet .page-empty {
-        color: #9ea9b8;
-      }
-
-      @media (max-width: 850px) {
-        #archive-sheet .archive-header {
-          padding: 26px 14px 12px !important;
-        }
-        .archive-mini-bar {
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-        .archive-brand {
-          font-size: 10px;
-        }
-        #archive-sheet .archive-tools {
-          order: 3;
-          flex: 1 1 100%;
-          justify-content: flex-start;
-        }
-        #archive-sheet #archive-search {
-          width: min(42vw, 220px);
-        }
-        #archive-sheet #archive-date {
-          width: min(37vw, 165px);
-        }
-        #archive-sheet .archive-rail {
-          gap: 35px;
-          padding: 42px 3vw 64px;
-        }
-        #archive-sheet .album-card {
-          flex-basis: 94vw;
-          padding: 12px 10px 24px;
-        }
-        #archive-sheet .album-spread,
-        #archive-sheet .album-cover {
-          height: clamp(320px, 59dvh, 560px);
-        }
-        #archive-sheet .album-spread {
-          padding: 4px;
-          border-width: 5px;
-        }
-        #archive-sheet .album-page {
-          padding: 13px 11px;
-        }
-        #archive-sheet .album-grid {
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          grid-auto-rows: clamp(32px, 5dvh, 54px);
-          gap: 6px;
-        }
-        #archive-sheet .album-photo {
-          grid-column: span 2;
-          padding: 4px 4px 19px;
-        }
-        #archive-sheet .album-photo.landscape {
-          grid-column: span 3;
-        }
-        #archive-sheet .album-photo.portrait {
-          grid-column: span 2;
-        }
-        #archive-sheet .album-cover-name {
-          font-size: 56px;
-        }
-      }
-    </style>
-    <!-- Three.js 모듈: glass3d.js와 동일한 버전 사용 -->
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
-        }
-      }
-    </script>
-  </head>
-  <body>
-    <main id="world">
-      <div id="world-track">
-        <section class="world-page" id="cover" aria-label="시작 화면">
-          <div class="brand-mark micro">
-            <span class="brand-bubble"></span> PHOTO MEMORY STUDIO / VOL.01
-          </div>
-          <div class="quiet-right micro">A PLACE FOR YOUR DAYS · 2026</div>
-
-          <!-- 실제 3D 책은 glass3d.js가 생성. HTML/CSS 가짜 책을 넣지 마세요. -->
-          <div class="floating-scene" aria-hidden="true">
-            <div id="three-glass-scene"></div>
-          </div>
-
-          <!-- Firebase 사진 랜덤 3장. 클릭하면 해당 사진의 편집창 열림 -->
-          <div id="cover-photo-floats" class="cover-photo-floats"></div>
-
-          <div id="cover-title">
-            <div class="micro eyebrow">COLLECT YOUR MOMENTS</div>
-            <h1>Capture<br />to <span>Memo.</span></h1>
-            <p>
-              사진을 남기고, 그날의 이야기를 적고,<br />시간이 지난 뒤 다시
-              펼쳐보는 나만의 사진 앨범.
-            </p>
-          </div>
-
-          <div class="cover-controls">
-            <button id="camera-btn" class="pill primary" type="button">
-              ✦ 촬영하기
-            </button>
-            <button id="gallery-btn" class="pill" type="button">
-              ＋ 이미지 불러오기
-            </button>
-          </div>
-        </section>
-
-        <section class="world-page" id="darkroom" aria-label="인화실">
-          <!-- 보이는 것은 줄과 폴라로이드 사진들뿐 -->
-          <span id="incoming-count" hidden aria-hidden="true"></span>
-          <div class="hanging-area" id="hanging-area">
-            <div class="photo-line" id="line-one"></div>
-            <div class="photo-line" id="line-two"></div>
-          </div>
-          <div id="room-empty" hidden aria-hidden="true"></div>
-        </section>
+      <!-- 실제 3D 책은 glass3d.js가 생성. HTML/CSS 가짜 책을 넣지 마세요. -->
+      <div class="floating-scene" aria-hidden="true">
+        <div id="three-glass-scene"></div>
       </div>
-    </main>
-    <button type="button" id="archive-tab">
-      ↑ &nbsp; OPEN THE ARCHIVE / 보관함
-    </button>
-    <section id="archive-sheet" aria-label="나의 사진 앨범" aria-hidden="true">
-      <header class="archive-header">
-        <button
-          id="archive-grip"
-          class="archive-grip"
-          type="button"
-          aria-label="보관함 닫기"
-        ></button>
-        <div class="archive-mini-bar">
-          <span class="archive-brand">CAPTURE TO MEMO / ARCHIVE</span>
-          <div class="archive-tools">
-            <input
-              type="search"
-              id="archive-search"
-              placeholder="메모 검색"
-              aria-label="메모 검색"
-            />
-            <input type="date" id="archive-date" aria-label="날짜로 검색" />
-            <button id="archive-reset" type="button">초기화</button>
-          </div>
-          <button id="archive-close" class="archive-close" type="button">
-            ✕ 닫기
-          </button>
-        </div>
-      </header>
-      <div id="album-rail" class="archive-rail"></div>
+
+      <!-- Firebase 사진 랜덤 3장. 클릭하면 해당 사진의 편집창 열림 -->
+      <div id="cover-photo-floats" class="cover-photo-floats"></div>
+
+      <div id="cover-title">
+        <div class="micro eyebrow">COLLECT YOUR MOMENTS</div>
+        <h1>Capture<br>to <span>Memo.</span></h1>
+        <p>사진을 남기고, 그날의 이야기를 적고,<br>시간이 지난 뒤 다시 펼쳐보는 나만의 사진 앨범.</p>
+      </div>
+
+      <div class="cover-controls">
+        <button id="camera-btn" class="pill primary" type="button">✦ 촬영하기</button>
+        <button id="gallery-btn" class="pill" type="button">＋ 이미지 불러오기</button>
+      </div>
     </section>
-    <div id="batch-bar" hidden>
-      <strong id="batch-count">0개 선택됨</strong
-      ><button type="button" id="batch-all">전체 선택</button
-      ><button type="button" id="batch-date">날짜 변경</button
-      ><button type="button" id="batch-delete" class="danger">삭제</button
-      ><button type="button" id="batch-cancel">취소</button>
+
+    <section class="world-page" id="darkroom" aria-label="인화실">
+      <!-- 보이는 것은 줄과 폴라로이드 사진들뿐 -->
+      <span id="incoming-count" hidden aria-hidden="true"></span>
+      <div id="darkroom-scene" aria-label="사진 인화실: 경사진 줄에 매달린 사진">
+        <div id="rear-deco-layer" aria-hidden="true"></div>
+        <div id="front-photo-layer"></div>
+      </div>
+      <div id="room-empty" hidden aria-hidden="true"></div>
+    </section>
+  </div>
+</main>
+<button type="button" id="archive-tab">↑ &nbsp; OPEN THE ARCHIVE / 보관함</button>
+<section id="archive-sheet" aria-label="나의 사진 앨범" aria-hidden="true">
+  <header class="archive-header">
+    <button id="archive-grip" class="archive-grip" type="button" aria-label="보관함 닫기"></button>
+    <div class="archive-mini-bar">
+      <span class="archive-brand">CAPTURE TO MEMO / ARCHIVE</span>
+      <div class="archive-tools">
+        <input type="search" id="archive-search" placeholder="메모 검색" aria-label="메모 검색">
+        <input type="date" id="archive-date" aria-label="날짜로 검색">
+        <button id="archive-reset" type="button">초기화</button>
+      </div>
+      <button id="archive-close" class="archive-close" type="button">✕ 닫기</button>
     </div>
-    <input
-      type="file"
-      accept="image/*"
-      capture="environment"
-      id="camera-input"
-      hidden
-    />
-    <input type="file" accept="image/*" id="gallery-input" hidden multiple />
-    <div id="modal-root"></div>
-    <div id="photo-viewer" class="overlay viewer" hidden>
-      <button type="button" id="viewer-close">✕ 닫기</button
-      ><img id="viewer-image" alt="큰 사진" />
-    </div>
-    <div id="toast" role="status" hidden></div>
-    <!-- 기존 프로젝트의 Firebase Realtime Database와 동일한 연결 -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
-    <script>
-      const firebaseConfig = {
-        apiKey: "AIzaSyCr5rtPZ6u8eqlXvBoyjm3RAerOYYiL44",
-        authDomain: "interactivememo.firebaseapp.com",
-        databaseURL: "https://interactivememo-default-rtdb.firebaseio.com",
-        projectId: "interactivememo",
-        storageBucket: "interactivememo.appspot.com",
-        messagingSenderId: "244477022912",
-        appId: "1:244477022912:web:7fa3461abc1c752e345325",
-        measurementId: "G-KBN8K062ZR",
-      };
-      if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-      window.db = firebase.database();
-    </script>
-    <script src="sketch.js"></script>
-    <!-- 기존 사용자 glass3d.js 파일을 같은 폴더에 유지하세요 -->
-    <script type="module" src="./glass3d.js"></script>
-  </body>
+  </header>
+  <div id="album-rail" class="archive-rail"></div>
+</section>
+<div id="batch-bar" hidden><strong id="batch-count">0개 선택됨</strong><button type="button" id="batch-all">전체 선택</button><button type="button" id="batch-date">날짜 변경</button><button type="button" id="batch-delete" class="danger">삭제</button><button type="button" id="batch-cancel">취소</button></div>
+<input type="file" accept="image/*" capture="environment" id="camera-input" hidden>
+<input type="file" accept="image/*" id="gallery-input" hidden multiple>
+<div id="modal-root"></div>
+<div id="photo-viewer" class="overlay viewer" hidden><button type="button" id="viewer-close">✕ 닫기</button><img id="viewer-image" alt="큰 사진"></div>
+<div id="toast" role="status" hidden></div>
+<!-- 기존 프로젝트의 Firebase Realtime Database와 동일한 연결 -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCr5rtPZ6u8eqlXvBoyjm3RAerOYYiL44",
+    authDomain: "interactivememo.firebaseapp.com",
+    databaseURL: "https://interactivememo-default-rtdb.firebaseio.com",
+    projectId: "interactivememo",
+    storageBucket: "interactivememo.appspot.com",
+    messagingSenderId: "244477022912",
+    appId: "1:244477022912:web:7fa3461abc1c752e345325",
+    measurementId: "G-KBN8K062ZR"
+  };
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  window.db = firebase.database();
+</script>
+<!-- Matter.js: 매달린 폴라로이드의 실제 흔들림을 계산하는 물리엔진 -->
+<script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
+<script src="sketch.js"></script>
+<!-- 기존 사용자 glass3d.js 파일을 같은 폴더에 유지하세요 -->
+<script type="module" src="./glass3d.js"></script>
+</body>
 </html>
