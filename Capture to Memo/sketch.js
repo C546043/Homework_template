@@ -94,12 +94,149 @@ function escapeHTML(s) {
 }
 
 // -------------------------------------------------------------------
+// 메인 표지: Firebase 사진 중 랜덤 3장 + 3D 기울기 + 편집창 연결
+// -------------------------------------------------------------------
+let coverFloatingIds = [];
+
+function shuffleCoverPhotos(items) {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+function coverPhotoPool() {
+  const all = [];
+  for (const [key, data] of saved) {
+    if (data?.image)
+      all.push({ source: "locker", key, data, t: memoTime(data) });
+  }
+  for (const [key, data] of incoming) {
+    if (data?.image)
+      all.push({ source: "incoming", key, data, t: memoTime(data) });
+  }
+  return all;
+}
+
+function applyCoverPhotoTilt() {
+  const host = $("cover-photo-floats");
+  if (!host) return;
+
+  // 실제 Three.js 책과 겹치지 않도록 서로 다른 위치 / 방향으로 배치
+  const layouts = [
+    { left: "33%", top: "74%", rot: -13, rx: 2, ry: -10, scale: 1.08 },
+    { left: "56%", top: "36%", rot: 7, rx: -2, ry: 8, scale: 0.92 },
+    { left: "59%", top: "79%", rot: 11, rx: 3, ry: 10, scale: 0.98 },
+  ];
+
+  const cards = [
+    ...host.querySelectorAll(".cover-float-card, .cover-float-shot"),
+  ];
+  cards.slice(0, 3).forEach((card, i) => {
+    const p = layouts[i];
+    card.style.position = "absolute";
+    card.style.left = p.left;
+    card.style.top = p.top;
+    card.style.right = "auto";
+    card.style.bottom = "auto";
+    card.style.zIndex = String(8 + i);
+    card.style.transformOrigin = "center center";
+    card.style.transformStyle = "preserve-3d";
+    card.style.willChange = "transform";
+    card.style.pointerEvents = "auto";
+    // 기존 floatPolaroid 애니메이션의 transform 덮어쓰기 방지
+    card.style.animation = "none";
+    card.style.filter = "drop-shadow(0 18px 32px rgba(52,76,173,0.14))";
+    card.style.transform = `translate(-50%, -50%) rotate(${p.rot}deg) rotateX(${p.rx}deg) rotateY(${p.ry}deg) scale(${p.scale})`;
+  });
+}
+
+function drawCoverPolaroids() {
+  const host = $("cover-photo-floats");
+  if (!host) return;
+
+  const pool = coverPhotoPool();
+  const byId = new Map(
+    pool.map((item) => [itemId(item.source, item.key), item]),
+  );
+
+  // 새 사진이 추가돼도 기존의 무작위 사진을 무조건 다시 바꾸지는 않음
+  coverFloatingIds = coverFloatingIds.filter((id) => byId.has(id));
+  const targetCount = Math.min(3, pool.length);
+  if (coverFloatingIds.length < targetCount) {
+    const candidates = shuffleCoverPhotos(
+      pool.filter(
+        (item) => !coverFloatingIds.includes(itemId(item.source, item.key)),
+      ),
+    );
+    for (const item of candidates.slice(
+      0,
+      targetCount - coverFloatingIds.length,
+    )) {
+      coverFloatingIds.push(itemId(item.source, item.key));
+    }
+  }
+  coverFloatingIds = coverFloatingIds.slice(0, targetCount);
+
+  host.replaceChildren();
+  host.hidden = targetCount === 0;
+
+  coverFloatingIds.forEach((id, index) => {
+    const item = byId.get(id);
+    if (!item) return;
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `cover-float-card pos-${index + 1}`;
+    card.setAttribute(
+      "aria-label",
+      `${item.data.labelTxt || localDay(item.t) || "사진"} 메모 편집`,
+    );
+    card.title = "사진을 눌러 메모 편집";
+    card.draggable = false;
+
+    const img = new Image();
+    img.src = item.data.image;
+    img.alt = item.data.labelTxt || "기록된 사진";
+    img.draggable = false;
+    img.loading = "lazy";
+
+    const label = document.createElement("span");
+    label.className = "cover-float-label";
+    label.textContent =
+      item.data.labelTxt?.trim() || localDay(item.t) || "MEMO";
+    card.append(img, label);
+
+    card.addEventListener("contextmenu", (event) => event.preventDefault());
+    card.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (busy || batchMode) return;
+      openEditor(item.source, item.key);
+    });
+
+    host.appendChild(card);
+  });
+
+  applyCoverPhotoTilt();
+}
+
+// -------------------------------------------------------------------
 // 1. 화면 이동 — 가로는 표지/인화실, 세로는 보관함
 // -------------------------------------------------------------------
 function goRoom(next) {
   if (batchMode || busy) return;
-  room = next === "darkroom" ? "darkroom" : "cover";
-  document.body.classList.toggle("in-darkroom", room === "darkroom");
+  const world = $("world");
+  if (!world) return;
+  const target =
+    next === "darkroom" ? world.scrollWidth - world.clientWidth : 0;
+  world.scrollTo({
+    left: target,
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? "instant"
+      : "smooth",
+  });
 }
 function setArchive(open) {
   if (batchMode || busy) return;
@@ -108,81 +245,150 @@ function setArchive(open) {
   $("archive-sheet").setAttribute("aria-hidden", String(!archiveOpen));
 }
 function setupSwipes() {
-  let gesture = null;
-  const blocked = (t) =>
-    t?.closest?.(
-      "input,textarea,select,[contenteditable],.dialog,.overlay,.format-tools,#batch-bar,.polaroid,.album-photo,.album-cover,.archive-tools,.archive-close,.cover-controls",
+  const world = $("world");
+  if (!world) return;
+
+  let pending = false;
+  function syncScroll() {
+    const max = Math.max(1, world.scrollWidth - world.clientWidth);
+    const progress = THREE_SAFE_CLAMP(world.scrollLeft / max);
+    window.__ctmRoomProgress = progress;
+    window.dispatchEvent(
+      new CustomEvent("ctm-room-progress", { detail: { progress } }),
     );
+    room = progress >= 0.5 ? "darkroom" : "cover";
+    document.body.classList.toggle("in-darkroom", room === "darkroom");
+  }
+  function THREE_SAFE_CLAMP(n) {
+    return Math.max(0, Math.min(1, n));
+  }
+  world.addEventListener(
+    "scroll",
+    () => {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => {
+        pending = false;
+        syncScroll();
+      });
+    },
+    { passive: true },
+  );
+
+  // PC: 배경을 마우스로 끌면 그만큼 이동, 손을 놓은 위치에 유지
+  let mouse = null;
+  let suppressClickUntil = 0;
+  const blocked = (target) =>
+    target instanceof Element &&
+    !!target.closest(
+      "button,input,textarea,select,[contenteditable],.polaroid," +
+        ".cover-float-card,.cover-float-shot,.album-photo,.album-cover," +
+        ".dialog,.overlay,.archive-tools,.cover-controls",
+    );
+
+  world.addEventListener("pointerdown", (event) => {
+    if (
+      event.pointerType !== "mouse" ||
+      event.button !== 0 ||
+      batchMode ||
+      busy ||
+      archiveOpen ||
+      blocked(event.target)
+    )
+      return;
+    mouse = {
+      id: event.pointerId,
+      x: event.clientX,
+      left: world.scrollLeft,
+      moved: false,
+    };
+    world.setPointerCapture(event.pointerId);
+  });
+
+  world.addEventListener("pointermove", (event) => {
+    if (!mouse || mouse.id !== event.pointerId) return;
+    const dx = event.clientX - mouse.x;
+    if (Math.abs(dx) > 7) mouse.moved = true;
+    world.scrollLeft = mouse.left - dx;
+  });
+
+  function endMouseDrag(event) {
+    if (!mouse || mouse.id !== event.pointerId) return;
+    const moved = mouse.moved;
+    mouse = null;
+    if (world.hasPointerCapture(event.pointerId)) {
+      world.releasePointerCapture(event.pointerId);
+    }
+    if (moved) suppressClickUntil = performance.now() + 350;
+    syncScroll();
+  }
+  world.addEventListener("pointerup", endMouseDrag);
+  world.addEventListener("pointercancel", endMouseDrag);
+  world.addEventListener(
+    "click",
+    (event) => {
+      if (performance.now() < suppressClickUntil) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    },
+    true,
+  );
+
+  // 보관함 세로 제스처는 이전 기능대로 유지
+  let verticalStart = null;
   document.addEventListener(
-    "pointerdown",
-    (e) => {
-      if (e.pointerType === "mouse" && e.button !== 0) return;
+    "touchstart",
+    (event) => {
       if (
+        event.touches.length !== 1 ||
         batchMode ||
         busy ||
-        blocked(e.target) ||
         document.querySelector(".overlay:not([hidden])")
-      )
+      ) {
+        verticalStart = null;
         return;
-      gesture = {
-        id: e.pointerId,
-        x: e.clientX,
-        y: e.clientY,
-        t: performance.now(),
-        target: e.target,
+      }
+      const touch = event.touches[0];
+      verticalStart = {
+        x: touch.clientX,
+        y: touch.clientY,
+        target: event.target,
       };
     },
-    true,
+    { capture: true, passive: true },
   );
+
   document.addEventListener(
-    "pointercancel",
-    () => {
-      gesture = null;
-    },
-    true,
-  );
-  document.addEventListener(
-    "pointerup",
-    (e) => {
-      if (!gesture || gesture.id !== e.pointerId) return;
-      const g = gesture;
-      gesture = null;
-      if (batchMode || busy) return;
-      const dx = e.clientX - g.x,
-        dy = e.clientY - g.y,
-        dt = Math.max(1, performance.now() - g.t);
+    "touchend",
+    (event) => {
+      if (!verticalStart || event.changedTouches.length !== 1) return;
+      const start = verticalStart;
+      verticalStart = null;
+      const touch = event.changedTouches[0];
+      const dx = touch.clientX - start.x;
+      const dy = touch.clientY - start.y;
+      if (Math.abs(dy) < 65 || Math.abs(dy) < Math.abs(dx) * 1.3) return;
       if (archiveOpen) {
-        // 앨범 자체의 가로 스크롤은 기본 스크롤을 그대로 사용
-        if (
-          g.target.closest("#archive-grip,.archive-header") &&
-          dy > 70 &&
-          Math.abs(dy) > Math.abs(dx) * 1.2
-        )
+        if (dy > 0 && start.target.closest?.("#archive-grip,.archive-header")) {
           setArchive(false);
-        return;
-      }
-      // 화면 하단에서 빠르게 위로 밀면 보관함 열기
-      if (
-        dy < -65 &&
-        Math.abs(dy) > Math.abs(dx) * 1.25 &&
-        g.y > innerHeight * 0.62 &&
-        dt < 850
-      ) {
+        }
+      } else if (dy < 0 && start.y > window.innerHeight * 0.62) {
         setArchive(true);
-        return;
-      }
-      // 표지 / 인화실 가로 이동
-      if (
-        Math.abs(dx) >= 45 &&
-        Math.abs(dx) / dt > 0.36 &&
-        Math.abs(dx) > Math.abs(dy) * 1.35
-      ) {
-        if (dx < 0 && room === "cover") goRoom("darkroom");
-        if (dx > 0 && room === "darkroom") goRoom("cover");
       }
     },
-    true,
+    { capture: true, passive: true },
   );
+  document.addEventListener(
+    "touchcancel",
+    () => {
+      verticalStart = null;
+    },
+    { capture: true, passive: true },
+  );
+
+  window.addEventListener("resize", syncScroll);
+  syncScroll();
 }
 
 // -------------------------------------------------------------------
@@ -195,6 +401,7 @@ function schedulePaint() {
     paintScheduled = false;
     drawDarkroom();
     drawAlbums();
+    drawCoverPolaroids();
     refreshBatch();
     drawMemoryPill();
   });
@@ -1312,8 +1519,9 @@ function setupViewportResize() {
   window.addEventListener("resize", apply);
 }
 function init() {
-  $("next-room").onclick = () => goRoom("darkroom");
-  $("prev-room").onclick = () => goRoom("cover");
+  // 예전 좌우 이동 버튼을 제거했더라도 오류가 나지 않게 함
+  if ($("next-room")) $("next-room").onclick = () => goRoom("darkroom");
+  if ($("prev-room")) $("prev-room").onclick = () => goRoom("cover");
   $("archive-tab").onclick = () => setArchive(true);
   $("archive-close").onclick = () => setArchive(false);
   $("archive-grip").onclick = () => setArchive(false);
@@ -1349,6 +1557,7 @@ function init() {
   subscribe("saved_memos", saved);
   drawDarkroom();
   drawAlbums();
+  drawCoverPolaroids();
   drawMemoryPill();
 }
 if (document.readyState === "loading")

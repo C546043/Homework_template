@@ -154,80 +154,162 @@
         width: 42px;
         background: var(--blue);
       }
-      /* 떠다니는 앨범 오브젝트: CSS 3D, 외부 이미지 불필요 */
+      /* 떠다니는 메인 책 */
       .floating-scene {
         position: absolute;
         inset: 0;
         pointer-events: none;
-        perspective: 1000px;
+        perspective: 1400px;
+        z-index: 2;
       }
+
       .floating-book {
         position: absolute;
-        border-radius: 5px 14px 14px 5px;
+        border-radius: 8px 18px 18px 8px;
         background: linear-gradient(
-          118deg,
-          rgba(255, 255, 255, 0.95),
-          rgba(217, 228, 255, 0.78) 67%,
-          rgba(153, 183, 255, 0.67)
+          120deg,
+          rgba(255, 255, 255, 0.88) 0%,
+          rgba(230, 239, 255, 0.78) 42%,
+          rgba(180, 203, 255, 0.6) 100%
         );
-        border: 1px solid rgba(255, 255, 255, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.85);
         box-shadow:
-          24px 35px 55px rgba(28, 70, 144, 0.14),
-          inset -13px 0 20px rgba(46, 100, 226, 0.12),
-          inset 3px 0 2px white;
+          24px 34px 60px rgba(44, 79, 160, 0.14),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.6),
+          inset -18px 0 24px rgba(95, 134, 235, 0.16);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
         transform-style: preserve-3d;
         animation: floatBook 7s ease-in-out infinite alternate;
       }
-      .floating-book:before {
-        content: "";
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 10%;
-        width: 2px;
-        background: rgba(30, 70, 160, 0.17);
-      }
+
+      /* 책 표지에 붙어 있던 원/공 장식 제거 */
+      .floating-book:before,
       .floating-book:after {
-        content: "";
-        position: absolute;
-        top: 15%;
-        right: 14%;
-        width: 35%;
-        aspect-ratio: 1;
-        border-radius: 50%;
-        background: radial-gradient(
-          circle at 27% 20%,
-          #fff,
-          #a3c5ff 35%,
-          #2458f7 78%,
-          #1733ac
-        );
-        filter: blur(0.5px);
+        display: none;
       }
+
+      /* 메인 책만 사용 */
       .floating-book.b1 {
-        width: 190px;
-        height: 255px;
-        right: 18%;
+        width: 420px;
+        height: 560px;
+        right: 10%;
         top: 12%;
-        transform: rotate(-18deg) rotateY(-32deg);
-        animation-delay: -2s;
+        transform: rotate(-10deg) rotateY(-28deg) rotateX(10deg);
+        transform-origin: 50% 60%;
+        overflow: visible;
       }
-      .floating-book.b2 {
-        width: 160px;
-        height: 210px;
-        right: 6%;
-        top: 44%;
-        transform: rotate(23deg) rotateY(31deg);
-        background: linear-gradient(110deg, #fff, #f2f3f7, #d3d8e7);
-        animation-delay: -4s;
-      }
+
+      /* 뒤에 있던 나머지 책은 숨김 */
+      .floating-book.b2,
       .floating-book.b3 {
-        width: 125px;
-        height: 170px;
-        right: 34%;
-        top: 56%;
-        transform: rotate(15deg) rotateY(-23deg);
-        animation-delay: -1s;
+        display: none;
+      }
+
+      /* 페이지 6장 정도 */
+      .floating-book.b1 .page {
+        position: absolute;
+        right: 18px;
+        bottom: 16px;
+        width: 84%;
+        height: 92%;
+        border-radius: 4px 10px 10px 4px;
+        background: linear-gradient(
+          135deg,
+          #ffffff 0%,
+          #fbfcff 70%,
+          #edf3ff 100%
+        );
+        border: 1px solid rgba(190, 205, 235, 0.55);
+        box-shadow: 0 10px 18px rgba(54, 86, 154, 0.08);
+        transform-origin: left bottom;
+      }
+
+      .floating-book.b1 .page.p1 {
+        transform: rotate(1deg) translate(0px, 0px);
+      }
+      .floating-book.b1 .page.p2 {
+        transform: rotate(5deg) translate(10px, 2px);
+      }
+      .floating-book.b1 .page.p3 {
+        transform: rotate(9deg) translate(20px, 4px);
+      }
+      .floating-book.b1 .page.p4 {
+        transform: rotate(13deg) translate(30px, 6px);
+      }
+      .floating-book.b1 .page.p5 {
+        transform: rotate(17deg) translate(40px, 8px);
+      }
+      .floating-book.b1 .page.p6 {
+        transform: rotate(21deg) translate(50px, 10px);
+      }
+
+      /* 책 주변 폴라로이드 3장 */
+      .cover-photo-floats {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        pointer-events: none;
+      }
+
+      .cover-float-card {
+        position: absolute;
+        width: 170px;
+        padding: 10px 10px 34px;
+        background: #fff;
+        border: 1px solid rgba(219, 225, 238, 0.95);
+        box-shadow: 0 14px 28px rgba(28, 48, 95, 0.16);
+        pointer-events: auto;
+        cursor: pointer;
+        transition:
+          transform 0.22s ease,
+          box-shadow 0.22s ease;
+      }
+
+      .cover-float-card:hover {
+        box-shadow: 0 18px 34px rgba(28, 48, 95, 0.2);
+      }
+
+      .cover-float-card img {
+        display: block;
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+        background: #edf1f7;
+        pointer-events: none;
+      }
+
+      .cover-float-label {
+        position: absolute;
+        left: 12px;
+        bottom: 8px;
+        right: 12px;
+        font-size: 11px;
+        color: #5e6c88;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        pointer-events: none;
+      }
+
+      /* 3장 각각 위치 + 기울기 */
+      .cover-float-card.pos-1 {
+        right: 22%;
+        top: 18%;
+        transform: rotate(9deg);
+      }
+
+      .cover-float-card.pos-2 {
+        left: 43%;
+        bottom: 14%;
+        transform: rotate(-8deg);
+      }
+
+      .cover-float-card.pos-3 {
+        right: 8%;
+        bottom: 10%;
+        transform: rotate(7deg);
       }
       .glass-orb {
         position: absolute;
@@ -333,6 +415,97 @@
       .side-nav.prev {
         left: 0;
         border-radius: 0 16px 16px 0;
+      }
+      /* 메인 책 옆 랜덤 폴라로이드 3장 */
+      #cover-photo-floats {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 2;
+      }
+
+      .cover-float-shot {
+        position: absolute;
+        width: clamp(92px, 9vw, 138px);
+        height: clamp(112px, 11vw, 168px);
+        padding: 8px 8px 26px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid rgba(212, 220, 236, 0.95);
+        box-shadow:
+          0 14px 30px rgba(28, 56, 116, 0.12),
+          0 4px 10px rgba(28, 56, 116, 0.06);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        transform: rotate(var(--tilt, 0deg));
+        border-radius: 2px;
+        overflow: hidden;
+        animation: floatPolaroid 7s ease-in-out infinite alternate;
+      }
+
+      .cover-float-shot img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+        background: #edf2fb;
+      }
+
+      .cover-float-shot .cover-shot-label {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        bottom: 7px;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: #71809b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .cover-float-shot.pos-1 {
+        right: 26%;
+        top: 58%;
+        animation-delay: -0.8s;
+      }
+
+      .cover-float-shot.pos-2 {
+        right: 8%;
+        top: 27%;
+        animation-delay: -2.2s;
+      }
+
+      .cover-float-shot.pos-3 {
+        right: 5%;
+        top: 68%;
+        animation-delay: -1.4s;
+      }
+
+      @keyframes floatPolaroid {
+        from {
+          transform: rotate(var(--tilt, 0deg)) translateY(0px);
+        }
+        to {
+          transform: rotate(var(--tilt, 0deg)) translateY(-12px);
+        }
+      }
+
+      @media (max-width: 760px) {
+        .cover-float-shot.pos-1 {
+          right: 18%;
+          top: 59%;
+        }
+
+        .cover-float-shot.pos-2 {
+          right: 2%;
+          top: 31%;
+        }
+
+        .cover-float-shot.pos-3 {
+          right: 1%;
+          top: 72%;
+        }
       }
       /* 인화실 */
       .darkroom-head {
@@ -1696,6 +1869,241 @@
           height: 50%;
         }
       }
+
+      /* ==========================================
+   CONTINUOUS HORIZONTAL ALBUM SPACE
+   표지 ↔ 인화실 연속 가로 스크롤
+========================================== */
+
+      /* 메인 화면을 실제로 가로 스크롤할 수 있게 */
+      #world {
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+
+        touch-action: pan-x pan-y !important;
+
+        scroll-snap-type: x mandatory;
+        overscroll-behavior-x: contain;
+
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      #world::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* 기존의 화면 통째로 전환하는 transform 제거 */
+      #world-track,
+      body.in-darkroom #world-track {
+        transform: none !important;
+        transition: none !important;
+      }
+
+      /* 한 화면씩 자연스럽게 정렬 */
+      #world .world-page {
+        scroll-snap-align: start;
+        scroll-snap-stop: always;
+      }
+
+      /* 폴라로이드 위에서도 가로로 스와이프 가능 */
+      #darkroom .polaroid {
+        touch-action: pan-x pan-y !important;
+      }
+
+      /* ==========================================
+   인화실은 사진과 와이어만 남김
+========================================== */
+
+      #darkroom .brand-mark,
+      #darkroom .darkroom-head,
+      #darkroom .room-counter,
+      #darkroom .room-empty,
+      #darkroom .side-nav,
+      #darkroom .polaroid-label {
+        display: none !important;
+      }
+
+      /* 인화실 두 개의 사진 줄 */
+      #darkroom .hanging-area {
+        top: 15%;
+        bottom: 15%;
+        left: 5%;
+        right: 5%;
+
+        gap: clamp(24px, 6vh, 60px);
+        overflow-x: auto;
+      }
+
+      /* 집게와 와이어 간격 */
+      #darkroom .photo-line {
+        padding-top: 30px;
+      }
+
+      /* 태블릿 및 휴대폰 */
+      @media (max-width: 760px) {
+        #darkroom .hanging-area {
+          top: 16%;
+          bottom: 14%;
+          left: 4%;
+          right: 4%;
+          gap: 16px;
+        }
+      }
+
+      /* ==========================================
+   INFINITE HORIZONTAL CANVAS
+   표지 + 인화실 하나의 연속 공간
+========================================== */
+
+      /* 자유로운 가로 스크롤 */
+      #world {
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+
+        /* 화면 단위 자동 정렬 제거 */
+        scroll-snap-type: none !important;
+
+        touch-action: pan-x pan-y;
+        overscroll-behavior-x: contain;
+
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      #world::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* 기존 슬라이드 전환 기능 완전히 제거 */
+      #world-track,
+      body.in-darkroom #world-track {
+        position: relative;
+
+        transform: none !important;
+        transition: none !important;
+
+        /* 두 화면에 걸쳐 이어지는 하나의 배경 */
+        background: linear-gradient(
+          105deg,
+          #ffffff 0%,
+          #fafcff 46%,
+          #f1f5ff 100%
+        );
+      }
+
+      /* 두 화면 자체에는 별도의 배경을 주지 않음 */
+      #world .world-page {
+        background: transparent !important;
+
+        scroll-snap-align: none !important;
+        scroll-snap-stop: normal !important;
+
+        position: relative;
+        z-index: 1;
+      }
+
+      /* 각각 끊어지던 배경 격자 제거 */
+      #world .world-page::before {
+        display: none !important;
+      }
+
+      /* 긴 가로 공간 전체에 하나의 격자 */
+      #world-track::before {
+        content: "";
+
+        position: absolute;
+        inset: 0;
+
+        background-image: linear-gradient(
+          to right,
+          rgba(27, 75, 165, 0.035) 1px,
+          transparent 1px
+        );
+
+        background-size: 20vw 100%;
+
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* 경계의 버튼과 안내 화살표 제거 */
+      #next-room,
+      #prev-room,
+      #cover .slide-hint {
+        display: none !important;
+      }
+
+      /* 인화실 화면은 기존처럼 사진과 줄만 표시 */
+      #darkroom .brand-mark,
+      #darkroom .darkroom-head,
+      #darkroom .room-counter,
+      #darkroom .room-empty {
+        display: none !important;
+      }
+
+      /* ========================================
+   기존 Three.js 3D 책 복구
+======================================== */
+
+      /* CSS 가짜 책은 사용하지 않음 */
+      #cover .floating-book,
+      #cover .floating-book.b1,
+      #cover .floating-book.b2,
+      #cover .floating-book.b3,
+      #cover .floating-book .page {
+        display: none !important;
+      }
+
+      /* 실제 3D 책이 그려지는 영역 */
+      #cover .floating-scene {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        overflow: hidden;
+      }
+
+      /* 기존 Three.js 장면 위치 유지 */
+      #three-glass-scene {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 28%;
+        width: auto;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      #three-glass-scene canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* 사진 3장은 실제 3D 책 위에 표시 */
+      #cover-photo-floats {
+        position: absolute;
+        inset: 0;
+        z-index: 4;
+        pointer-events: none;
+      }
+
+      #cover-photo-floats .cover-float-card,
+      #cover-photo-floats .cover-float-shot {
+        pointer-events: auto;
+        cursor: pointer;
+      }
+
+      /* 제목과 촬영 버튼 유지 */
+      #cover-title {
+        z-index: 5;
+      }
+
+      .cover-controls {
+        z-index: 6;
+      }
     </style>
 
     <!-- Three.js 라이브러리 연결 -->
@@ -1720,19 +2128,13 @@
           </div>
           <div class="quiet-right micro">A PLACE FOR YOUR DAYS · 2026</div>
 
+          <!-- 실제 Three.js 책만 표시 -->
           <div class="floating-scene" aria-hidden="true">
-            <!-- Three.js 3D 오브젝트가 표시될 공간 -->
             <div id="three-glass-scene"></div>
-
-            <!-- 3D 로딩 실패 시 보여줄 기존 장식 -->
-            <div class="floating-book b1"></div>
-            <div class="floating-book b2"></div>
-            <div class="floating-book b3"></div>
-
-            <div class="glass-orb orb1"></div>
-            <div class="glass-orb orb2"></div>
-            <div class="wire-orbit"></div>
           </div>
+
+          <!-- 실제 사진이 들어가는 폴라로이드 3장 -->
+          <div id="cover-photo-floats" class="cover-photo-floats"></div>
 
           <div id="cover-title">
             <div class="micro eyebrow">COLLECT YOUR MOMENTS</div>
@@ -1742,6 +2144,7 @@
               펼쳐보는 나만의 사진 앨범.
             </p>
           </div>
+          <div id="cover-photo-floats" aria-hidden="true"></div>
           <div class="cover-controls">
             <button id="camera-btn" class="pill primary" type="button">
               ✦ 촬영하기
@@ -1751,14 +2154,6 @@
             </button>
           </div>
           <div class="slide-hint">왼쪽으로 밀어 인화실 보기 <b>←</b></div>
-          <button
-            id="next-room"
-            class="side-nav next"
-            type="button"
-            aria-label="인화실로 이동"
-          >
-            ❮
-          </button>
         </section>
         <section class="world-page" id="darkroom" aria-label="인화실">
           <div class="brand-mark micro">
@@ -1781,14 +2176,6 @@
             아직 걸려 있는 사진이 없어요.<br />표지에서 사진을 촬영하거나 불러와
             주세요.
           </div>
-          <button
-            id="prev-room"
-            class="side-nav prev"
-            type="button"
-            aria-label="표지로 이동"
-          >
-            ❯
-          </button>
         </section>
       </div>
     </main>
