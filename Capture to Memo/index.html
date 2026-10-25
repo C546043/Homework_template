@@ -1188,8 +1188,529 @@
           transition-duration: 0.001ms !important;
         }
       }
+
+      /* ==========================================
+   CAPTURE TO MEMO
+   CLEAR GLASS MATERIAL — V2
+
+   White / Cobalt Blue / Translucent
+========================================== */
+
+      /* 01. 전체 배경: 차갑고 맑은 화이트 */
+      .world-page {
+        background:
+          radial-gradient(
+            ellipse at 73% 36%,
+            rgba(118, 159, 255, 0.09),
+            transparent 42%
+          ),
+          radial-gradient(
+            ellipse at 20% 90%,
+            rgba(205, 224, 255, 0.12),
+            transparent 38%
+          ),
+          linear-gradient(145deg, #ffffff 0%, #fafcff 52%, #f4f7fd 100%);
+      }
+
+      /* ==========================================
+   02. 떠다니는 책: 반투명 아크릴
+========================================== */
+
+      .floating-book,
+      .floating-book.b2 {
+        background: linear-gradient(
+          115deg,
+          rgba(255, 255, 255, 0.82) 0%,
+          rgba(255, 255, 255, 0.25) 28%,
+          rgba(180, 207, 255, 0.13) 63%,
+          rgba(70, 117, 255, 0.18) 100%
+        );
+
+        border: 1px solid rgba(255, 255, 255, 0.95);
+
+        box-shadow:
+          inset 2px 2px 3px rgba(255, 255, 255, 0.98),
+          inset -5px -5px 20px rgba(47, 101, 235, 0.08),
+          0 22px 45px rgba(52, 89, 167, 0.07),
+          0 3px 12px rgba(41, 72, 135, 0.025);
+
+        -webkit-backdrop-filter: blur(14px) saturate(125%);
+        backdrop-filter: blur(14px) saturate(125%);
+      }
+
+      /* 책등: 얇은 파란빛 */
+      .floating-book::before {
+        left: 8%;
+        width: 3px;
+
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.95),
+          rgba(44, 94, 241, 0.23),
+          rgba(255, 255, 255, 0.35)
+        );
+
+        box-shadow: 2px 0 6px rgba(67, 106, 224, 0.08);
+      }
+
+      /* 책 표지의 푸른 원형 장식도 유리처럼 */
+      .floating-book::after {
+        background: radial-gradient(
+          circle at 30% 25%,
+          rgba(255, 255, 255, 1) 0%,
+          rgba(255, 255, 255, 0.72) 11%,
+          rgba(179, 208, 255, 0.23) 32%,
+          rgba(46, 97, 243, 0.19) 68%,
+          rgba(255, 255, 255, 0.1) 100%
+        );
+
+        border: 1px solid rgba(255, 255, 255, 0.9);
+
+        box-shadow:
+          inset -5px -7px 12px rgba(36, 78, 220, 0.1),
+          inset 2px 3px 6px rgba(255, 255, 255, 0.9),
+          0 9px 20px rgba(48, 97, 218, 0.08);
+
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+      }
+
+      /* ==========================================
+   03. 유리 구체: 맑고 투명한 렌즈
+========================================== */
+
+      .glass-orb {
+        overflow: hidden;
+
+        background: radial-gradient(
+          ellipse at 29% 22%,
+          rgba(255, 255, 255, 0.98) 0%,
+          rgba(255, 255, 255, 0.58) 12%,
+          rgba(255, 255, 255, 0.08) 28%,
+          rgba(82, 134, 255, 0.1) 54%,
+          rgba(39, 86, 223, 0.2) 81%,
+          rgba(255, 255, 255, 0.28) 100%
+        );
+
+        border: 1px solid rgba(255, 255, 255, 0.95);
+
+        box-shadow:
+          inset 3px 4px 8px rgba(255, 255, 255, 0.95),
+          inset -6px -9px 15px rgba(40, 89, 221, 0.12),
+          0 12px 26px rgba(49, 96, 215, 0.07),
+          0 1px 5px rgba(51, 91, 169, 0.04);
+
+        -webkit-backdrop-filter: blur(7px) saturate(135%);
+        backdrop-filter: blur(7px) saturate(135%);
+      }
+
+      /* 위쪽 유리 반사광 */
+      .glass-orb::before {
+        content: "";
+        position: absolute;
+
+        top: 10%;
+        left: 15%;
+        width: 43%;
+        height: 24%;
+
+        border-radius: 50%;
+
+        background: radial-gradient(
+          ellipse,
+          rgba(255, 255, 255, 0.98),
+          rgba(255, 255, 255, 0.08) 75%,
+          transparent
+        );
+
+        filter: blur(3px);
+        pointer-events: none;
+      }
+
+      /* 구체 안에 아주 옅게 스며든 코발트 블루 */
+      .glass-orb::after {
+        content: "";
+        position: absolute;
+        bottom: 4%;
+        right: 5%;
+
+        width: 58%;
+        height: 51%;
+        border-radius: 50%;
+
+        background: radial-gradient(
+          circle,
+          rgba(30, 85, 244, 0.16),
+          rgba(90, 149, 255, 0.045) 65%,
+          transparent 100%
+        );
+
+        filter: blur(7px);
+        pointer-events: none;
+      }
+
+      /* 유리 구체 주변의 얇은 궤도 */
+      .wire-orbit {
+        border-color: rgba(40, 79, 166, 0.18);
+
+        box-shadow:
+          0 1px 1px rgba(255, 255, 255, 0.8),
+          inset 0 1px 1px rgba(255, 255, 255, 0.5);
+      }
+
+      /* ==========================================
+   04. 인화실: 매트 폴라로이드와 유리 집게
+========================================== */
+
+      /* 실제 인화 사진처럼 종이 질감 유지 */
+      .polaroid {
+        background: linear-gradient(
+          150deg,
+          rgba(255, 255, 255, 0.99),
+          rgba(250, 251, 254, 0.97)
+        );
+
+        border: 1px solid rgba(255, 255, 255, 0.98);
+
+        box-shadow:
+          0 13px 28px rgba(50, 78, 140, 0.1),
+          0 2px 5px rgba(37, 64, 115, 0.055),
+          inset 0 0 0 1px rgba(203, 217, 239, 0.3);
+      }
+
+      /* 폴라로이드 집게: 투명 아크릴 */
+      .polaroid::before {
+        background: linear-gradient(
+          90deg,
+          rgba(100, 148, 255, 0.16),
+          rgba(255, 255, 255, 0.92) 30%,
+          rgba(255, 255, 255, 0.38) 54%,
+          rgba(80, 126, 244, 0.2) 100%
+        );
+
+        border: 1px solid rgba(255, 255, 255, 0.94);
+
+        box-shadow:
+          inset 1px 0 2px rgba(255, 255, 255, 0.95),
+          inset -2px 0 3px rgba(65, 105, 225, 0.1),
+          0 3px 7px rgba(42, 69, 132, 0.1);
+
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+      }
+
+      /* 실제 사진은 투명하게 처리하지 않음 */
+      .polaroid img {
+        opacity: 1;
+      }
+
+      /* 사진을 거는 와이어 */
+      .photo-line::before {
+        border-top: 1px solid rgba(74, 110, 172, 0.3);
+        box-shadow: 0 1px 1px rgba(255, 255, 255, 0.95);
+      }
+
+      /* ==========================================
+   05. 보관함: 유리 앨범 및 부드러운 종이
+========================================== */
+
+      /* 펼쳐진 책의 외곽 */
+      .album-spread {
+        background: rgba(255, 255, 255, 0.78);
+
+        border: 1px solid rgba(255, 255, 255, 0.95);
+
+        box-shadow:
+          14px 21px 38px rgba(48, 77, 137, 0.1),
+          0 3px 10px rgba(45, 78, 142, 0.035),
+          inset 0 1px 1px rgba(255, 255, 255, 0.95);
+      }
+
+      /* 앨범 속 종이는 매트하게 유지 */
+      .album-page,
+      .album-page + .album-page {
+        background: linear-gradient(
+          120deg,
+          rgba(255, 255, 255, 0.98),
+          rgba(250, 251, 253, 0.96)
+        );
+      }
+
+      /* 펼쳐진 책의 중앙 접힘 */
+      .album-spread::after {
+        background: linear-gradient(
+          90deg,
+          rgba(53, 80, 133, 0.1),
+          rgba(255, 255, 255, 0.85) 45%,
+          rgba(59, 88, 151, 0.065)
+        );
+      }
+
+      /* 닫힌 앨범: 반투명 아크릴 표지 */
+      .album-cover {
+        overflow: hidden;
+
+        background: linear-gradient(
+          128deg,
+          rgba(255, 255, 255, 0.96) 0%,
+          rgba(255, 255, 255, 0.42) 31%,
+          rgba(166, 194, 255, 0.13) 75%,
+          rgba(64, 113, 245, 0.21) 100%
+        );
+
+        border-left: 12px solid rgba(32, 80, 234, 0.78);
+
+        box-shadow:
+          16px 22px 38px rgba(36, 68, 147, 0.1),
+          inset 2px 2px 2px rgba(255, 255, 255, 0.98),
+          inset -8px -10px 24px rgba(67, 110, 237, 0.08);
+
+        -webkit-backdrop-filter: blur(14px) saturate(120%);
+        backdrop-filter: blur(14px) saturate(120%);
+      }
+
+      /* 앨범 표지의 장식 구체 */
+      .album-cover::after {
+        opacity: 1;
+
+        background: radial-gradient(
+          circle at 28% 23%,
+          rgba(255, 255, 255, 0.99) 0%,
+          rgba(255, 255, 255, 0.58) 16%,
+          rgba(159, 201, 255, 0.19) 42%,
+          rgba(44, 99, 240, 0.2) 75%,
+          rgba(255, 255, 255, 0.08) 100%
+        );
+
+        border: 1px solid rgba(255, 255, 255, 0.95);
+
+        box-shadow:
+          inset -8px -10px 20px rgba(50, 98, 238, 0.11),
+          0 12px 28px rgba(48, 101, 235, 0.08);
+
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+      }
+
+      /* 보관된 사진은 색상과 선명도 유지 */
+      .album-photo img {
+        opacity: 1;
+      }
+
+      /* ==========================================
+   06. 하단 보관함 핸들: Frosted Glass
+========================================== */
+
+      #archive-tab {
+        background: linear-gradient(
+          125deg,
+          rgba(255, 255, 255, 0.82),
+          rgba(210, 224, 255, 0.42)
+        );
+
+        color: #1649f5;
+
+        border: 1px solid rgba(255, 255, 255, 0.95);
+        border-bottom: 0;
+
+        box-shadow:
+          0 -9px 25px rgba(45, 84, 170, 0.09),
+          inset 0 1px 2px rgba(255, 255, 255, 0.95);
+
+        -webkit-backdrop-filter: blur(20px) saturate(145%);
+        backdrop-filter: blur(20px) saturate(145%);
+      }
+
+      #archive-tab::before {
+        background: rgba(22, 73, 245, 0.55);
+      }
+
+      /* 화면 양옆 이동 버튼 */
+      .side-nav {
+        background: rgba(255, 255, 255, 0.48);
+
+        border: 1px solid rgba(255, 255, 255, 0.92);
+
+        box-shadow:
+          0 10px 25px rgba(45, 85, 160, 0.07),
+          inset 0 1px 2px rgba(255, 255, 255, 0.9);
+
+        -webkit-backdrop-filter: blur(16px);
+        backdrop-filter: blur(16px);
+      }
+
+      /* ==========================================
+   07. 보관함 전체 배경
+========================================== */
+
+      #archive-sheet {
+        background:
+          radial-gradient(
+            ellipse at 80% 15%,
+            rgba(100, 150, 255, 0.1),
+            transparent 42%
+          ),
+          linear-gradient(
+            145deg,
+            rgba(255, 255, 255, 0.98),
+            rgba(246, 249, 255, 0.98)
+          );
+
+        box-shadow: 0 -18px 70px rgba(30, 65, 138, 0.14);
+      }
+
+      /* ==========================================
+   08. 마우스 / 터치 반응
+========================================== */
+
+      @media (hover: hover) {
+        .floating-book:hover,
+        .glass-orb:hover {
+          filter: brightness(1.04);
+        }
+
+        .polaroid:hover {
+          box-shadow:
+            0 18px 33px rgba(50, 78, 140, 0.14),
+            0 4px 9px rgba(37, 64, 115, 0.055);
+        }
+      }
+
+      /* 애니메이션 최소화 설정 존중 */
+      @media (prefers-reduced-motion: reduce) {
+        .floating-book,
+        .glass-orb {
+          animation: none;
+        }
+      }
+
+      /* ==================================
+   THREE.JS GLASS SCENE
+================================== */
+
+      /* 기존 표지 장식 영역 */
+      #cover .floating-scene {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      /* 실제 3D 캔버스 영역 */
+      #three-glass-scene {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      #three-glass-scene canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      /* 실제 3D가 준비되면 CSS 장식을 숨김 */
+      #cover.three-ready .floating-scene > :not(#three-glass-scene) {
+        display: none !important;
+      }
+
+      /* 제목은 3D보다 앞쪽 */
+      #cover-title {
+        z-index: 3;
+      }
+
+      /* 촬영 버튼은 정상적으로 터치 가능 */
+      #cover .cover-controls {
+        z-index: 5;
+      }
+      /* =========================================
+   HERO 3D SCENE LAYOUT — BIG BOOK VERSION
+========================================= */
+
+      #cover {
+        overflow: hidden;
+      }
+
+      #cover .floating-scene {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        overflow: hidden;
+      }
+
+      #three-glass-scene {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 28%;
+        width: auto;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      #three-glass-scene canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      #cover.three-ready .floating-scene > :not(#three-glass-scene) {
+        display: none !important;
+      }
+
+      /* 왼쪽 텍스트가 3D 위로 올라오게 */
+      #cover-title,
+      .cover-copy,
+      .cover-controls {
+        position: relative;
+        z-index: 4;
+      }
+
+      /* 반응형 */
+      @media (max-width: 1200px) {
+        #three-glass-scene {
+          left: 18%;
+        }
+      }
+
+      @media (max-width: 900px) {
+        #three-glass-scene {
+          left: 0;
+          top: 18%;
+          height: 56%;
+        }
+      }
+
+      @media (max-width: 700px) {
+        #three-glass-scene {
+          left: -6%;
+          right: -6%;
+          top: 20%;
+          height: 50%;
+        }
+      }
     </style>
+
+    <!-- Three.js 라이브러리 연결 -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+        }
+      }
+    </script>
   </head>
+
+  <!-- 3D 유리 오브젝트 -->
+  <script type="module" src="./glass3d.js"></script>
   <body>
     <main id="world">
       <div id="world-track">
@@ -1198,14 +1719,21 @@
             <span class="brand-bubble"></span> PHOTO MEMORY STUDIO / VOL.01
           </div>
           <div class="quiet-right micro">A PLACE FOR YOUR DAYS · 2026</div>
+
           <div class="floating-scene" aria-hidden="true">
+            <!-- Three.js 3D 오브젝트가 표시될 공간 -->
+            <div id="three-glass-scene"></div>
+
+            <!-- 3D 로딩 실패 시 보여줄 기존 장식 -->
             <div class="floating-book b1"></div>
             <div class="floating-book b2"></div>
             <div class="floating-book b3"></div>
+
             <div class="glass-orb orb1"></div>
             <div class="glass-orb orb2"></div>
             <div class="wire-orbit"></div>
           </div>
+
           <div id="cover-title">
             <div class="micro eyebrow">COLLECT YOUR MOMENTS</div>
             <h1>Capture<br />to <span>Memo.</span></h1>
