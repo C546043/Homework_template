@@ -1867,56 +1867,6 @@
         position: relative;
       }
 
-      /* 기존 버튼 스타일 덮어쓰기 */
-      #locker-screen #back-btn {
-        position: absolute;
-        left: 0;
-        top: 50%;
-        transform: translateY(-50%);
-
-        width: 66px;
-        height: 170px;
-        padding: 12px 8px;
-
-        display: flex;
-        align-items: center;
-        justify-content: center;
-
-        writing-mode: vertical-rl;
-        text-orientation: mixed;
-
-        background: var(--cream);
-        color: #315c59;
-
-        border: 0;
-        border-radius: 0 14px 14px 0;
-
-        font-size: 14px;
-        font-weight: 800;
-        cursor: pointer;
-
-        z-index: 10;
-      }
-
-      /* 왼쪽 버튼이 보관함 카드와 겹치지 않도록 여백 확보 */
-      #locker-screen #locker-content {
-        margin-left: 48px;
-        min-width: 0;
-      }
-
-      /* 모바일에서는 버튼을 조금 작게 */
-      @media (max-width: 680px) {
-        #locker-screen #back-btn {
-          width: 45px;
-          height: 135px;
-          font-size: 12px;
-        }
-
-        #locker-screen #locker-content {
-          margin-left: 32px;
-        }
-      }
-
       /* 브라우저의 가로 스와이프 히스토리 동작 최소화 */
       html,
       body,
@@ -1964,29 +1914,43 @@
 
         <!-- 보관함 화면 -->
         <section id="locker-screen" class="screen">
-          <!-- 왼쪽 가장자리의 작업대 이동 버튼 -->
-          <button type="button" id="back-btn" aria-label="작업대로 돌아가기">
-            ❮ 작업대로
-          </button>
-
+          <!-- 보관함 상단 -->
           <header id="locker-header">
+            <!-- 작업대로 돌아가기 버튼: 원래 위치 -->
+            <button type="button" id="back-btn" aria-label="작업대로 돌아가기">
+              ❮ 작업대로
+            </button>
+
             <h2>나의 보관함</h2>
 
-            <!-- 나머지 기존 검색창, 달력 등의 코드는 그대로 유지 -->
+            <small> 사진 터치 또는 더블클릭으로 수정할 수 있어요. </small>
+
+            <!-- 검색 및 날짜 선택 -->
+            <div id="locker-search-tools">
+              <input
+                id="locker-search"
+                type="search"
+                placeholder="메모 검색"
+                aria-label="메모 검색"
+              />
+
+              <input id="locker-date" type="date" aria-label="날짜로 검색" />
+
+              <button id="locker-filter-reset" type="button">초기화</button>
+            </div>
           </header>
 
-          <!-- 기존 보관함 본문도 그대로 유지 -->
-
-          <!-- 보관함 본문: 날짜별 목록 + 오늘의 메모 -->
+          <!-- 보관함 본문 -->
           <div id="locker-content">
-            <!-- 기존 날짜별 보관함 -->
+            <!-- 날짜별 사진 및 메모 목록 -->
             <div id="locker"></div>
 
-            <!-- 오른쪽 오늘의 메모 -->
+            <!-- 오른쪽: 오늘의 메모 -->
             <aside id="daily-memory-panel">
               <div class="daily-memory-header">
                 <div>
-                  <span class="daily-memory-eyebrow">MEMORY OF THE DAY</span>
+                  <span class="daily-memory-eyebrow"> MEMORY OF THE DAY </span>
+
                   <h3>✨ 오늘의 메모</h3>
                 </div>
               </div>
@@ -1995,10 +1959,12 @@
                 잊고 있던 순간을 다시 만나보세요.
               </p>
 
+              <!-- 랜덤 추억 표시 영역 -->
               <div id="daily-memory-content">
                 <p class="daily-memory-empty">지난 추억을 찾고 있어요...</p>
               </div>
 
+              <!-- 다른 추억 보기 -->
               <button
                 id="daily-memory-shuffle"
                 type="button"

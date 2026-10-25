@@ -1,0 +1,1350 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <title>Capture to Memo — Archive Studio</title>
+    <style>
+      :root {
+        --blue: #1649f5;
+        --ink: #182340;
+        --muted: #858fa4;
+        --line: rgba(24, 35, 64, 0.12);
+        --paper: #fbfcff;
+        --shade: #f0f3f9;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: Arial, "Malgun Gothic", sans-serif;
+        color: var(--ink);
+        background: #f7f9fd;
+      }
+      button,
+      input {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      [contenteditable]:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 3px;
+      }
+      button {
+        border: 0;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      /* 공간 A: 표지와 인화실을 하나의 가로 공간으로 */
+      #world {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        touch-action: pan-y;
+      }
+      #world-track {
+        display: flex;
+        width: 200vw;
+        height: 100%;
+        transform: translateX(0);
+        transition: transform 0.82s cubic-bezier(0.21, 0.92, 0.22, 1);
+      }
+      body.in-darkroom #world-track {
+        transform: translateX(-100vw);
+      }
+      .world-page {
+        position: relative;
+        width: 100vw;
+        height: 100%;
+        flex: 0 0 100vw;
+        overflow: hidden;
+        background: linear-gradient(135deg, #fff 0%, #f8faff 58%, #eff4ff 100%);
+      }
+      .world-page:before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: linear-gradient(
+          to right,
+          rgba(27, 75, 165, 0.035) 1px,
+          transparent 1px
+        );
+        background-size: 20vw 100%;
+        pointer-events: none;
+      }
+      .micro {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+      }
+      .brand-mark {
+        position: absolute;
+        top: 30px;
+        left: 4vw;
+        z-index: 3;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .brand-bubble {
+        width: 25px;
+        height: 25px;
+        border: 6px solid var(--blue);
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 3px white;
+      }
+      .quiet-right {
+        position: absolute;
+        right: 4vw;
+        top: 35px;
+        color: var(--muted);
+      }
+      /* 표지 */
+      #cover-title {
+        position: absolute;
+        z-index: 3;
+        top: 24%;
+        left: 7vw;
+        pointer-events: none;
+      }
+      #cover-title h1 {
+        font-size: clamp(70px, 10vw, 190px);
+        line-height: 0.88;
+        letter-spacing: -0.092em;
+        margin: 24px 0;
+        color: #172642;
+        font-weight: 900;
+      }
+      #cover-title h1 span {
+        color: var(--blue);
+      }
+      #cover-title p {
+        font-size: clamp(13px, 1.2vw, 18px);
+        line-height: 1.7;
+        color: #62708a;
+        margin-top: 30px;
+      }
+      #cover-title .eyebrow {
+        color: var(--blue);
+        display: flex;
+        gap: 14px;
+        align-items: center;
+      }
+      .eyebrow:before {
+        content: "";
+        height: 2px;
+        width: 42px;
+        background: var(--blue);
+      }
+      /* 떠다니는 앨범 오브젝트: CSS 3D, 외부 이미지 불필요 */
+      .floating-scene {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        perspective: 1000px;
+      }
+      .floating-book {
+        position: absolute;
+        border-radius: 5px 14px 14px 5px;
+        background: linear-gradient(
+          118deg,
+          rgba(255, 255, 255, 0.95),
+          rgba(217, 228, 255, 0.78) 67%,
+          rgba(153, 183, 255, 0.67)
+        );
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        box-shadow:
+          24px 35px 55px rgba(28, 70, 144, 0.14),
+          inset -13px 0 20px rgba(46, 100, 226, 0.12),
+          inset 3px 0 2px white;
+        transform-style: preserve-3d;
+        animation: floatBook 7s ease-in-out infinite alternate;
+      }
+      .floating-book:before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 10%;
+        width: 2px;
+        background: rgba(30, 70, 160, 0.17);
+      }
+      .floating-book:after {
+        content: "";
+        position: absolute;
+        top: 15%;
+        right: 14%;
+        width: 35%;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 27% 20%,
+          #fff,
+          #a3c5ff 35%,
+          #2458f7 78%,
+          #1733ac
+        );
+        filter: blur(0.5px);
+      }
+      .floating-book.b1 {
+        width: 190px;
+        height: 255px;
+        right: 18%;
+        top: 12%;
+        transform: rotate(-18deg) rotateY(-32deg);
+        animation-delay: -2s;
+      }
+      .floating-book.b2 {
+        width: 160px;
+        height: 210px;
+        right: 6%;
+        top: 44%;
+        transform: rotate(23deg) rotateY(31deg);
+        background: linear-gradient(110deg, #fff, #f2f3f7, #d3d8e7);
+        animation-delay: -4s;
+      }
+      .floating-book.b3 {
+        width: 125px;
+        height: 170px;
+        right: 34%;
+        top: 56%;
+        transform: rotate(15deg) rotateY(-23deg);
+        animation-delay: -1s;
+      }
+      .glass-orb {
+        position: absolute;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        background: radial-gradient(
+          circle at 27% 18%,
+          white 1%,
+          rgba(188, 218, 255, 0.4) 22%,
+          rgba(42, 95, 237, 0.65) 67%,
+          rgba(255, 255, 255, 0.3) 100%
+        );
+        box-shadow:
+          inset -9px -10px 20px rgba(0, 40, 174, 0.17),
+          10px 20px 40px rgba(27, 70, 165, 0.12);
+        animation: floatBook 8s ease-in-out infinite alternate;
+      }
+      .orb1 {
+        width: 112px;
+        height: 112px;
+        right: 36%;
+        top: 16%;
+      }
+      .orb2 {
+        width: 65px;
+        height: 65px;
+        right: 12%;
+        bottom: 11%;
+        animation-delay: -2s;
+      }
+      .wire-orbit {
+        position: absolute;
+        width: 400px;
+        height: 190px;
+        border: 1px solid rgba(29, 65, 170, 0.24);
+        border-radius: 50%;
+        right: 5%;
+        top: 26%;
+        transform: rotate(-27deg);
+      }
+      @keyframes floatBook {
+        to {
+          translate: 0 -22px;
+        }
+      }
+      .cover-controls {
+        position: absolute;
+        z-index: 5;
+        bottom: 12%;
+        left: 7vw;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .pill {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 100px;
+        padding: 14px 19px;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 800;
+        box-shadow: 0 8px 20px rgba(45, 73, 117, 0.05);
+      }
+      .pill.primary {
+        background: var(--blue);
+        color: white;
+        border-color: var(--blue);
+      }
+      .slide-hint {
+        position: absolute;
+        right: 5%;
+        bottom: 11%;
+        color: #6f7e99;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+      }
+      .slide-hint b {
+        font-size: 32px;
+        color: var(--blue);
+        font-weight: 400;
+      }
+      .side-nav {
+        position: absolute;
+        z-index: 7;
+        top: 50%;
+        transform: translateY(-50%);
+        padding: 18px 14px;
+        background: rgba(255, 255, 255, 0.82);
+        backdrop-filter: blur(12px);
+        box-shadow: 0 10px 30px rgba(30, 60, 110, 0.09);
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        color: var(--blue);
+        font-weight: 800;
+      }
+      .side-nav.next {
+        right: 0;
+        border-radius: 16px 0 0 16px;
+      }
+      .side-nav.prev {
+        left: 0;
+        border-radius: 0 16px 16px 0;
+      }
+      /* 인화실 */
+      .darkroom-head {
+        position: absolute;
+        z-index: 3;
+        top: 12%;
+        left: 8%;
+        right: 9%;
+      }
+      .darkroom-head h2 {
+        font-size: clamp(42px, 6vw, 96px);
+        margin: 14px 0 8px;
+        letter-spacing: -0.075em;
+      }
+      .darkroom-head p {
+        color: #778399;
+        font-size: 14px;
+      }
+      .darkroom-label {
+        color: var(--blue);
+      }
+      .room-counter {
+        position: absolute;
+        right: 9%;
+        top: 17%;
+        font-weight: 800;
+        font-size: 13px;
+      }
+      .hanging-area {
+        position: absolute;
+        left: 7%;
+        right: 6%;
+        top: 34%;
+        bottom: 14%;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+      }
+      .photo-line {
+        position: relative;
+        display: flex;
+        align-items: flex-start;
+        gap: 25px;
+        flex: 1;
+        min-height: 180px;
+        padding: 27px 26px 5px;
+        isolation: isolate;
+      }
+      .photo-line:before {
+        content: "";
+        position: absolute;
+        top: 23px;
+        left: 0;
+        right: 0;
+        min-width: 100%;
+        border-top: 2px solid #b5c1d8;
+        box-shadow: 0 3px 2px white;
+        z-index: -1;
+      }
+      .polaroid {
+        position: relative;
+        flex: 0 0 auto;
+        width: clamp(125px, 11vw, 174px);
+        height: clamp(145px, 14vw, 200px);
+        padding: 9px 9px 27px;
+        background: #fff;
+        border: 1px solid #e6e8ec;
+        box-shadow: 0 12px 26px rgba(27, 50, 90, 0.16);
+        transform: rotate(var(--tilt, 2deg));
+        transition:
+          transform 0.23s,
+          opacity 0.2s;
+        touch-action: pan-y;
+      }
+      .polaroid:hover {
+        transform: rotate(0deg) translateY(-7px);
+      }
+      .polaroid:before {
+        content: "";
+        position: absolute;
+        width: 14px;
+        height: 27px;
+        left: calc(50% - 7px);
+        top: -21px;
+        background: linear-gradient(90deg, #c1c8d1, #fff, #97a9c6);
+        border: 1px solid #a6b3c8;
+        border-radius: 3px;
+        box-shadow: 0 2px 2px #97a9c6;
+        z-index: 3;
+      }
+      .polaroid img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #e9edf4;
+        pointer-events: none;
+      }
+      .polaroid-label {
+        position: absolute;
+        left: 10px;
+        bottom: 6px;
+        font-size: 10px;
+        color: #536481;
+        white-space: nowrap;
+      }
+      .room-empty {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        color: #9aa5ba;
+        line-height: 1.8;
+        pointer-events: none;
+      }
+      /* 보관함: 아래에서 위로 열리는 별도 공간 */
+      #archive-tab {
+        position: fixed;
+        z-index: 15;
+        left: 50%;
+        bottom: 0;
+        transform: translateX(-50%);
+        min-width: 232px;
+        padding: 12px 20px 15px;
+        border-radius: 17px 17px 0 0;
+        background: var(--blue);
+        color: #fff;
+        box-shadow: 0 -8px 28px rgba(35, 70, 190, 0.12);
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        touch-action: none;
+      }
+      #archive-tab:before {
+        content: "";
+        display: block;
+        width: 42px;
+        height: 4px;
+        background: #c8d7ff;
+        border-radius: 8px;
+        margin: 0 auto 10px;
+      }
+      #archive-sheet {
+        position: fixed;
+        z-index: 20;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 96dvh;
+        border-radius: 26px 26px 0 0;
+        background: linear-gradient(145deg, #fff, #f0f4ff);
+        box-shadow: 0 -20px 90px rgba(13, 39, 101, 0.22);
+        transform: translateY(104%);
+        transition: transform 0.82s cubic-bezier(0.21, 0.92, 0.22, 1);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        touch-action: pan-y;
+      }
+      body.archive-open #archive-sheet {
+        transform: translateY(0);
+      }
+      .archive-header {
+        padding: 13px 5% 18px;
+        border-bottom: 1px solid var(--line);
+        flex: 0 0 auto;
+      }
+      .archive-grip {
+        width: 65px;
+        height: 5px;
+        background: #b8c6e1;
+        border-radius: 8px;
+        display: block;
+        margin: 0 auto 20px;
+        touch-action: none;
+      }
+      .archive-titlebar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .archive-titlebar h2 {
+        font-size: clamp(32px, 4vw, 62px);
+        line-height: 1;
+        letter-spacing: -0.065em;
+        margin: 10px 0;
+      }
+      .archive-titlebar p {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .archive-close {
+        background: #fff;
+        border: 1px solid var(--line);
+        padding: 12px 17px;
+        border-radius: 100px;
+        color: var(--blue);
+        font-weight: 800;
+      }
+      .archive-tools {
+        display: flex;
+        gap: 9px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .archive-tools input {
+        padding: 10px 12px;
+        min-height: 40px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        max-width: 200px;
+      }
+      .archive-tools button {
+        min-height: 40px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: #e5edff;
+        color: #1744bc;
+        font-weight: 800;
+      }
+      .archive-rail {
+        display: flex;
+        align-items: stretch;
+        gap: 50px;
+        flex: 1;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x mandatory;
+        padding: 34px max(5%, 25px) 24px;
+        scrollbar-width: thin;
+      }
+      .album-card {
+        flex: 0 0 min(910px, 86vw);
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        scroll-snap-align: center;
+        cursor: pointer;
+        transition: transform 0.3s;
+      }
+      .album-card:nth-child(even) {
+        translate: 0 12px;
+      }
+      .album-card:hover {
+        transform: translateY(-6px);
+      }
+      .album-caption {
+        display: flex;
+        justify-content: space-between;
+        gap: 15px;
+        align-items: center;
+        font-size: 11px;
+        color: #6b7690;
+        letter-spacing: 0.13em;
+      }
+      .album-spread {
+        height: 100%;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border: 1px solid #e6e6df;
+        border-radius: 5px 16px 16px 5px;
+        box-shadow:
+          17px 23px 36px rgba(22, 46, 104, 0.16),
+          inset -8px 0 12px rgba(40, 66, 133, 0.05);
+        background: #fcfcf8;
+        overflow: hidden;
+        position: relative;
+      }
+      .album-spread:after {
+        content: "";
+        position: absolute;
+        left: calc(50% - 7px);
+        top: 0;
+        bottom: 0;
+        width: 14px;
+        background: linear-gradient(
+          90deg,
+          rgba(60, 62, 87, 0.14),
+          rgba(255, 255, 255, 0.7),
+          rgba(60, 62, 87, 0.09)
+        );
+        pointer-events: none;
+      }
+      .album-page {
+        min-width: 0;
+        min-height: 0;
+        padding: 22px 20px;
+        background: linear-gradient(100deg, #fefdfa, #f9f9f6);
+        overflow: auto;
+      }
+      .album-page + .album-page {
+        border-left: 1px solid #d6d6d2;
+        background: linear-gradient(90deg, #faf9f5, #fffef9);
+      }
+      .page-date {
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        font-weight: 800;
+        margin: 0 0 12px;
+        color: #53627b;
+      }
+      .album-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-auto-rows: 66px;
+        grid-auto-flow: dense;
+        gap: 8px;
+      }
+      .album-photo {
+        position: relative;
+        background: #edf0f5;
+        padding: 5px;
+        min-width: 0;
+        min-height: 0;
+        border: 1px solid #e1e3e8;
+        box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.07);
+        grid-column: span 2;
+        grid-row: span 2;
+      }
+      .album-photo.portrait {
+        grid-column: span 2;
+        grid-row: span 3;
+      }
+      .album-photo.landscape {
+        grid-column: span 3;
+        grid-row: span 2;
+      }
+      .album-photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        pointer-events: none;
+      }
+      .album-photo:after {
+        content: attr(data-date);
+        position: absolute;
+        bottom: 5px;
+        left: 7px;
+        padding: 2px 4px;
+        background: rgba(255, 255, 255, 0.83);
+        color: #68748a;
+        font-size: 9px;
+      }
+      .page-empty {
+        color: #b0b5bf;
+        font-style: italic;
+        font-size: 14px;
+        margin: 45px 0;
+        text-align: center;
+      }
+      .album-cover {
+        display: none;
+        height: 100%;
+        min-height: 0;
+        border-radius: 7px 19px 19px 7px;
+        background: linear-gradient(130deg, #e9efff, #fff 35%, #c8d6ff 100%);
+        border-left: 16px solid #1649f5;
+        box-shadow: 17px 23px 36px rgba(22, 46, 104, 0.16);
+        padding: 12%;
+        position: relative;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      .album-cover:after {
+        content: "";
+        position: absolute;
+        width: 40%;
+        aspect-ratio: 1;
+        right: 8%;
+        top: 18%;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 25% 20%,
+          white,
+          #91b8ff 36%,
+          #1b56f1 76%,
+          #071e86
+        );
+        opacity: 0.85;
+      }
+      .album-cover h3 {
+        font-size: clamp(34px, 4vw, 70px);
+        line-height: 0.92;
+        letter-spacing: -0.08em;
+        margin: 0;
+        position: relative;
+        z-index: 1;
+      }
+      .album-cover p {
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        position: relative;
+        z-index: 1;
+      }
+      .album-card.closed .album-spread {
+        display: none;
+      }
+      .album-card.closed .album-cover {
+        display: flex;
+      }
+      .archive-empty {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 12px;
+        color: #8190ab;
+        text-align: center;
+      }
+      .memory-pill {
+        margin-left: auto;
+        font-size: 12px;
+        background: #fff;
+        border: 1px solid var(--line);
+        padding: 9px 12px;
+        border-radius: 13px;
+        color: #536481;
+        cursor: pointer;
+        max-width: min(400px, 100%);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      /* 다중 선택 */
+      body.batch-mode .polaroid,
+      body.batch-mode .album-photo {
+        opacity: 0.38;
+      }
+      body.batch-mode .polaroid.selected,
+      body.batch-mode .album-photo.selected {
+        opacity: 1;
+        outline: 3px solid var(--blue);
+        outline-offset: 3px;
+      }
+      .selection-check {
+        display: none;
+        position: absolute;
+        z-index: 3;
+        inset: 0;
+        place-items: center;
+        color: white;
+        font-size: 36px;
+        text-shadow: 0 1px 15px #0525a9;
+        pointer-events: none;
+      }
+      body.batch-mode .selected .selection-check {
+        display: grid;
+      }
+      #batch-bar {
+        position: fixed;
+        z-index: 45;
+        left: 50%;
+        bottom: 15px;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+        background: #fff;
+        border: 1px solid var(--line);
+        padding: 11px 15px;
+        border-radius: 18px;
+        box-shadow: 0 15px 45px #1b3b752e;
+      }
+      #batch-bar button {
+        background: #edf1ff;
+        padding: 9px 12px;
+        border-radius: 9px;
+        color: #2444a5;
+        font-weight: 800;
+      }
+      #batch-bar .danger {
+        color: white;
+        background: #d94c5f;
+      }
+      /* 메모 편집 및 팝업 */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(18, 34, 66, 0.42);
+        z-index: 60;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 15px;
+        backdrop-filter: blur(9px);
+      }
+      .dialog {
+        width: min(620px, 98vw);
+        max-height: calc(var(--visual-height, 100dvh) - 24px);
+        overflow: auto;
+        background: white;
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow: 0 30px 90px rgba(10, 25, 55, 0.24);
+      }
+      .dialog h3 {
+        font-size: 24px;
+        letter-spacing: -0.04em;
+        margin: 0;
+      }
+      .dialog .sub {
+        color: #768198;
+        font-size: 13px;
+      }
+      .dialog-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+      .dialog-head button {
+        background: #f1f4fb;
+        padding: 9px 13px;
+        border-radius: 12px;
+        color: #1838ac;
+      }
+      .edit-image {
+        display: block;
+        width: 100%;
+        height: min(33dvh, 285px);
+        object-fit: contain;
+        background: #eef1f8;
+        border-radius: 13px;
+        cursor: zoom-in;
+        margin: 14px 0;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        margin: 12px 0;
+      }
+      .field label {
+        font-weight: 800;
+        font-size: 12px;
+        color: #53627b;
+      }
+      .field input {
+        border: 1px solid #d9dfec;
+        background: #fbfcff;
+        border-radius: 10px;
+        padding: 12px;
+        font-size: 16px;
+      }
+      .format-tools {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin: 12px 0;
+        padding: 9px;
+        background: #f4f6fb;
+        border-radius: 10px;
+      }
+      .format-tools button {
+        background: white;
+        border: 1px solid #dde3ef;
+        color: #233354;
+        padding: 7px 10px;
+        min-height: 36px;
+        border-radius: 7px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .format-tools button[data-color] {
+        background: var(--tone);
+        width: 27px;
+        height: 27px;
+        border-radius: 50%;
+        padding: 0;
+        min-height: 0;
+      }
+      .rich-editor {
+        min-height: 145px;
+        border: 1px solid #dae0eb;
+        padding: 14px;
+        border-radius: 11px;
+        outline: none;
+        line-height: 1.7;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font-size: 16px;
+      }
+      .rich-editor:empty:before {
+        content: attr(data-placeholder);
+        color: #b0b7c6;
+      }
+      .rich-editor .memo-task {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .rich-editor .memo-task input {
+        width: 17px;
+        height: 17px;
+        margin-top: 5px;
+        accent-color: var(--blue);
+      }
+      .rich-editor .memo-task span {
+        flex: 1;
+        min-width: 0;
+        outline: none;
+      }
+      .rich-editor .memo-task input:checked + span {
+        text-decoration: line-through;
+        color: #9ba3b2;
+      }
+      .dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 18px;
+      }
+      .dialog-actions button {
+        padding: 12px 17px;
+        border-radius: 10px;
+        background: #eaf0ff;
+        color: #1742cb;
+        font-weight: 800;
+      }
+      .dialog-actions .solid {
+        background: var(--blue);
+        color: white;
+      }
+      .dialog-actions .danger {
+        background: #db4960;
+        color: white;
+      }
+      .date-combined {
+        display: flex;
+        border: 1px solid #d9dfec;
+        border-radius: 10px;
+        overflow: hidden;
+        height: 48px;
+        position: relative;
+      }
+      .date-combined .date-display {
+        position: absolute;
+        left: 12px;
+        top: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        letter-spacing: 0.04em;
+        font: 700 18px monospace;
+        pointer-events: none;
+      }
+      .date-display .ghost {
+        color: #b4bed0;
+      }
+      .date-combined .masked-date {
+        border: 0;
+        background: transparent;
+        color: transparent;
+        -webkit-text-fill-color: transparent;
+        caret-color: transparent;
+        z-index: 1;
+        flex: 1;
+        min-width: 0;
+        font: 18px monospace;
+        padding: 0 12px;
+      }
+      .picker-wrap {
+        position: relative;
+        flex: 0 0 50px;
+        background: #eaf0ff;
+        display: grid;
+        place-items: center;
+        color: var(--blue);
+      }
+      .picker-wrap input[type="date"] {
+        position: absolute;
+        inset: 0;
+        opacity: 0.02;
+        width: 100%;
+        height: 100%;
+        cursor: pointer;
+      }
+      .picker-wrap input::-webkit-calendar-picker-indicator {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+      }
+      .dialog .error {
+        color: #b83d51;
+        font-size: 12px;
+        margin: 10px 0;
+      }
+      .viewer {
+        z-index: 90;
+        background: rgba(5, 11, 27, 0.96);
+      }
+      .viewer img {
+        max-width: 96vw;
+        max-height: 94dvh;
+        object-fit: contain;
+      }
+      .viewer button {
+        position: absolute;
+        top: 24px;
+        right: 24px;
+        background: #fff;
+        color: #172642;
+        padding: 10px 16px;
+        border-radius: 10px;
+      }
+      #toast {
+        position: fixed;
+        z-index: 150;
+        top: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #162957;
+        color: white;
+        padding: 12px 18px;
+        border-radius: 12px;
+        box-shadow: 0 12px 30px #0003;
+        font-size: 13px;
+      }
+      @media (max-width: 760px) {
+        #cover-title {
+          top: 24%;
+          left: 6vw;
+        }
+        #cover-title h1 {
+          font-size: clamp(58px, 13vw, 100px);
+        }
+        .floating-book.b1 {
+          right: -3%;
+          top: 12%;
+          opacity: 0.55;
+        }
+        .floating-book.b2 {
+          right: -7%;
+          top: 58%;
+          opacity: 0.55;
+        }
+        .floating-book.b3 {
+          right: 5%;
+          top: 48%;
+          opacity: 0.5;
+        }
+        .glass-orb {
+          opacity: 0.6;
+        }
+        .cover-controls {
+          bottom: 18%;
+          left: 6vw;
+        }
+        .slide-hint {
+          bottom: 9%;
+          right: 7%;
+        }
+        .darkroom-head {
+          top: 12%;
+          left: 9%;
+        }
+        .darkroom-head h2 {
+          font-size: 56px;
+        }
+        .hanging-area {
+          top: 35%;
+          bottom: 17%;
+          left: 5%;
+          right: 5%;
+        }
+        .photo-line {
+          gap: 15px;
+        }
+        .archive-header {
+          padding: 10px 4%;
+        }
+        .archive-titlebar h2 {
+          font-size: 35px;
+        }
+        .archive-tools input {
+          max-width: 140px;
+        }
+        .archive-rail {
+          gap: 20px;
+          padding: 24px 5%;
+        }
+        .album-card {
+          flex-basis: 93vw;
+        }
+        .album-page {
+          padding: 10px 8px;
+        }
+        .album-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-auto-rows: 52px;
+          gap: 5px;
+        }
+        .album-photo.landscape {
+          grid-column: span 3;
+        }
+        .album-photo.portrait {
+          grid-column: span 2;
+        }
+        .page-date {
+          font-size: 9px;
+        }
+        .dialog {
+          padding: 15px;
+        }
+        .format-tools button {
+          padding: 8px;
+        }
+        .memory-pill {
+          max-width: 145px;
+        }
+      }
+      @media (max-height: 570px) {
+        #cover-title {
+          top: 18%;
+        }
+        .cover-controls {
+          bottom: 9%;
+        }
+        .hanging-area {
+          top: 40%;
+          bottom: 12%;
+        }
+        .photo-line {
+          min-height: 140px;
+        }
+        .polaroid {
+          height: 140px;
+          width: 125px;
+        }
+        .archive-rail {
+          padding-top: 12px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *:before,
+        *:after {
+          animation-duration: 0.001ms !important;
+          transition-duration: 0.001ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="world">
+      <div id="world-track">
+        <section class="world-page" id="cover" aria-label="시작 화면">
+          <div class="brand-mark micro">
+            <span class="brand-bubble"></span> PHOTO MEMORY STUDIO / VOL.01
+          </div>
+          <div class="quiet-right micro">A PLACE FOR YOUR DAYS · 2026</div>
+          <div class="floating-scene" aria-hidden="true">
+            <div class="floating-book b1"></div>
+            <div class="floating-book b2"></div>
+            <div class="floating-book b3"></div>
+            <div class="glass-orb orb1"></div>
+            <div class="glass-orb orb2"></div>
+            <div class="wire-orbit"></div>
+          </div>
+          <div id="cover-title">
+            <div class="micro eyebrow">COLLECT YOUR MOMENTS</div>
+            <h1>Capture<br />to <span>Memo.</span></h1>
+            <p>
+              사진을 남기고, 그날의 이야기를 적고,<br />시간이 지난 뒤 다시
+              펼쳐보는 나만의 사진 앨범.
+            </p>
+          </div>
+          <div class="cover-controls">
+            <button id="camera-btn" class="pill primary" type="button">
+              ✦ 촬영하기
+            </button>
+            <button id="gallery-btn" class="pill" type="button">
+              ＋ 이미지 불러오기
+            </button>
+          </div>
+          <div class="slide-hint">왼쪽으로 밀어 인화실 보기 <b>←</b></div>
+          <button
+            id="next-room"
+            class="side-nav next"
+            type="button"
+            aria-label="인화실로 이동"
+          >
+            ❮
+          </button>
+        </section>
+        <section class="world-page" id="darkroom" aria-label="인화실">
+          <div class="brand-mark micro">
+            <span class="brand-bubble"></span> CAPTURE TO MEMO / PRINT ROOM
+          </div>
+          <div class="darkroom-head">
+            <span class="micro darkroom-label">02 / BEFORE THE ARCHIVE</span>
+            <h2>The Print Room.</h2>
+            <p>
+              아직 앨범에 넣지 않은 사진들이에요. 사진을 눌러 이야기를
+              적어보세요.
+            </p>
+          </div>
+          <div class="room-counter micro" id="incoming-count">00 PHOTOS</div>
+          <div class="hanging-area" id="hanging-area">
+            <div class="photo-line" id="line-one"></div>
+            <div class="photo-line" id="line-two"></div>
+          </div>
+          <div id="room-empty" class="room-empty" hidden>
+            아직 걸려 있는 사진이 없어요.<br />표지에서 사진을 촬영하거나 불러와
+            주세요.
+          </div>
+          <button
+            id="prev-room"
+            class="side-nav prev"
+            type="button"
+            aria-label="표지로 이동"
+          >
+            ❯
+          </button>
+        </section>
+      </div>
+    </main>
+    <button type="button" id="archive-tab">
+      ↑ &nbsp; OPEN THE ARCHIVE / 보관함
+    </button>
+    <section id="archive-sheet" aria-label="나의 사진 앨범" aria-hidden="true">
+      <div class="archive-header">
+        <button
+          id="archive-grip"
+          class="archive-grip"
+          type="button"
+          aria-label="보관함 닫기"
+        ></button>
+        <div class="archive-titlebar">
+          <div>
+            <div class="micro" style="color: var(--blue)">
+              CAPTURE TO MEMO / THE ARCHIVE
+            </div>
+            <h2>Our little albums.</h2>
+            <p>하루가 한 페이지가 되어 쌓이는 곳.</p>
+          </div>
+          <button id="archive-close" class="archive-close" type="button">
+            ↓ 닫기
+          </button>
+        </div>
+        <div class="archive-tools">
+          <input
+            type="search"
+            id="archive-search"
+            placeholder="제목·내용 검색"
+            aria-label="메모 검색"
+          /><input
+            type="date"
+            id="archive-date"
+            aria-label="날짜로 검색"
+          /><button id="archive-reset" type="button">초기화</button
+          ><button id="memory-pill" class="memory-pill" type="button">
+            ✦ 오늘의 메모
+          </button>
+        </div>
+      </div>
+      <div id="album-rail" class="archive-rail"></div>
+    </section>
+    <div id="batch-bar" hidden>
+      <strong id="batch-count">0개 선택됨</strong
+      ><button type="button" id="batch-all">전체 선택</button
+      ><button type="button" id="batch-date">날짜 변경</button
+      ><button type="button" id="batch-delete" class="danger">삭제</button
+      ><button type="button" id="batch-cancel">취소</button>
+    </div>
+    <input
+      type="file"
+      accept="image/*"
+      capture="environment"
+      id="camera-input"
+      hidden
+    />
+    <input type="file" accept="image/*" id="gallery-input" hidden multiple />
+    <div id="modal-root"></div>
+    <div id="photo-viewer" class="overlay viewer" hidden>
+      <button type="button" id="viewer-close">✕ 닫기</button
+      ><img id="viewer-image" alt="큰 사진" />
+    </div>
+    <div id="toast" role="status" hidden></div>
+    <!-- 기존 프로젝트의 Firebase Realtime Database와 동일한 연결 -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyCr5rtPZ6u8eqlXvBoyjm3RAerOYYiL44",
+        authDomain: "interactivememo.firebaseapp.com",
+        databaseURL: "https://interactivememo-default-rtdb.firebaseio.com",
+        projectId: "interactivememo",
+        storageBucket: "interactivememo.appspot.com",
+        messagingSenderId: "244477022912",
+        appId: "1:244477022912:web:7fa3461abc1c752e345325",
+        measurementId: "G-KBN8K062ZR",
+      };
+      if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+      window.db = firebase.database();
+    </script>
+    <script src="sketch.js"></script>
+  </body>
+</html>
