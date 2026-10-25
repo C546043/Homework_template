@@ -333,8 +333,9 @@ if (mount && cover) {
 
     const { book: heroBook, frontPivot } = createBook();
 
-    // 책 위치
-    heroBook.position.set(0.38, 0.02, 0.2);
+    //책 위치
+    const BOOK_BASE_Y = -0.6;
+    heroBook.position.set(0.38, BOOK_BASE_Y, 0.2);
 
     // X: 살짝 뒤로 눕히기
     // Y: 표지와 종이 함께 보이기
@@ -342,7 +343,7 @@ if (mount && cover) {
     heroBook.rotation.set(-0.29, 0.08, 0.08);
 
     // 메인 책 크기
-    heroBook.scale.setScalar(1.48);
+    heroBook.scale.setScalar(1.8);
 
     stage.add(heroBook);
 
@@ -564,7 +565,7 @@ if (mount && cover) {
         // 메인 책 부유 모션
         // --------------------------------
 
-        heroBook.position.y = 0.02 + Math.sin(t * 0.75) * 0.085;
+        heroBook.position.y = BOOK_BASE_Y + Math.sin(t * 0.75) * 0.085;
 
         heroBook.rotation.x = -0.29 + Math.sin(t * 0.32) * 0.018;
 

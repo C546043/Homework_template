@@ -2104,6 +2104,88 @@
       .cover-controls {
         z-index: 6;
       }
+
+      /* 촬영 및 이미지 불러오기 버튼: 화면 왼쪽 아래 */
+      #cover .cover-controls {
+        position: absolute !important;
+
+        left: 7vw !important;
+        top: auto !important;
+        bottom: 10% !important;
+
+        transform: none !important;
+
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+
+        z-index: 10;
+      }
+
+      /* ========================================
+   FLOATING POLAROID ANIMATION
+   Capture to Memo
+======================================== */
+
+      /* 폴라로이드 3장 공통 */
+      #cover-photo-floats .cover-float-card {
+        animation: memoFloat 7s ease-in-out infinite alternate;
+
+        /* 기존 JS의 transform과 독립적으로 움직임 */
+        translate: 0 0;
+        rotate: 0deg;
+        transform-style: preserve-3d;
+      }
+
+      /* 1번: 천천히 부유 */
+      #cover-photo-floats .cover-float-card:nth-child(1) {
+        animation-duration: 7.5s;
+        animation-delay: -1.5s;
+        --float-distance: 13px;
+        --float-rotate: -2deg;
+      }
+
+      /* 2번: 조금 더 크게 부유 */
+      #cover-photo-floats .cover-float-card:nth-child(2) {
+        animation-duration: 9s;
+        animation-delay: -4s;
+        --float-distance: 19px;
+        --float-rotate: 2deg;
+      }
+
+      /* 3번: 조금 빠르게 부유 */
+      #cover-photo-floats .cover-float-card:nth-child(3) {
+        animation-duration: 6.8s;
+        animation-delay: -2.8s;
+        --float-distance: 15px;
+        --float-rotate: -3deg;
+      }
+
+      /* 떠다니는 움직임 */
+      @keyframes memoFloat {
+        0% {
+          translate: 0 0;
+          rotate: 0deg;
+        }
+
+        50% {
+          translate: 4px calc(var(--float-distance) * -0.55);
+          rotate: var(--float-rotate);
+        }
+
+        100% {
+          translate: -3px calc(var(--float-distance) * -1);
+          rotate: 0deg;
+        }
+      }
+
+      /* 움직임 감소 환경설정 */
+      @media (prefers-reduced-motion: reduce) {
+        #cover-photo-floats .cover-float-card {
+          animation: none !important;
+        }
+      }
     </style>
 
     <!-- Three.js 라이브러리 연결 -->

@@ -125,10 +125,37 @@ function applyCoverPhotoTilt() {
   if (!host) return;
 
   // 실제 Three.js 책과 겹치지 않도록 서로 다른 위치 / 방향으로 배치
+
   const layouts = [
-    { left: "33%", top: "74%", rot: -13, rx: 2, ry: -10, scale: 1.08 },
-    { left: "56%", top: "36%", rot: 7, rx: -2, ry: 8, scale: 0.92 },
-    { left: "59%", top: "79%", rot: 11, rx: 3, ry: 10, scale: 0.98 },
+    // 1번 사진: 책의 왼쪽 위
+    {
+      left: "51%",
+      top: "23%",
+      rot: 12,
+      rx: 11,
+      ry: -30,
+      scale: 0.7,
+    },
+
+    // 2번 사진: 책의 오른쪽 중간
+    {
+      left: "89%",
+      top: "41%",
+      rot: -10,
+      rx: -10,
+      ry: 23,
+      scale: 1.02,
+    },
+
+    // 3번 사진: 책의 오른쪽 아래
+    {
+      left: "82%",
+      top: "79%",
+      rot: 30,
+      rx: 20,
+      ry: -40,
+      scale: 0.82,
+    },
   ];
 
   const cards = [
@@ -147,7 +174,6 @@ function applyCoverPhotoTilt() {
     card.style.willChange = "transform";
     card.style.pointerEvents = "auto";
     // 기존 floatPolaroid 애니메이션의 transform 덮어쓰기 방지
-    card.style.animation = "none";
     card.style.filter = "drop-shadow(0 18px 32px rgba(52,76,173,0.14))";
     card.style.transform = `translate(-50%, -50%) rotate(${p.rot}deg) rotateX(${p.rx}deg) rotateY(${p.ry}deg) scale(${p.scale})`;
   });
