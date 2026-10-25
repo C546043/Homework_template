@@ -2,366 +2,2152 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Capture to Memo!</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+
     <style>
+      :root {
+        --cream: #f8f4e8;
+        --navy: #244665;
+        --mint: #c4d8d3;
+        --yellow: #fff5cb;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
       body {
         margin: 0;
-        display: flex;
-        height: 100vh;
-        font-family: "Pretendard", sans-serif;
-        background-color: #fbf5e7;
-        color: #333;
+        overflow: hidden;
+        color: var(--navy);
+        font-family: Arial, "Malgun Gothic", sans-serif;
+        background: var(--cream);
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      /* 두 화면을 옆으로 연결 */
+      #viewport {
+        width: 100vw;
+        height: 100dvh;
         overflow: hidden;
       }
 
-      #left-panel {
-        width: 280px;
-        border-right: 2px solid #e0dacc;
-        padding: 20px;
-        box-sizing: border-box;
-        background-color: #fbf5e7;
+      #screen-track {
+        display: flex;
+        width: 200vw;
+        height: 100%;
+        transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      #screen-track.show-locker {
+        transform: translateX(-100vw);
+      }
+
+      .screen {
+        width: 100vw;
+        height: 100%;
+        flex: 0 0 100vw;
+        min-width: 0;
+      }
+
+      /* 사진 수신 화면 */
+      #work-screen {
         display: flex;
         flex-direction: column;
+        background: var(--cream);
+        position: relative;
+      }
+
+      #work-header {
+        flex: 0 0 94px;
+        padding: 20px 100px 16px 30px;
+        border-bottom: 2px solid #e8e0d0;
+        display: flex;
+        align-items: center;
+        gap: 22px;
+      }
+
+      #app-title {
+        background: white;
+        border: 2px solid var(--navy);
+        border-radius: 10px;
+        padding: 15px 22px;
+        font-size: 21px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      #work-header p {
+        color: #78818a;
+        font-size: 14px;
+      }
+
+      #incoming-scroll {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 28px 100px 60px 40px;
+      }
+
+      #incoming-list {
+        max-width: 1250px;
+        margin: 0 auto;
+      }
+
+      #empty-message {
+        padding: 100px 20px;
+        text-align: center;
+        font-size: 17px;
+        color: #8a918b;
+      }
+
+      .hour-group {
+        margin-bottom: 38px;
+      }
+
+      .hour-title {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 20px;
+        font-size: 18px;
+        font-weight: bold;
+      }
+
+      .hour-title::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: #d5d5cb;
+      }
+
+      .hour-count {
+        color: #90958f;
+        font-size: 13px;
+        font-weight: normal;
+      }
+
+      .photo-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
         gap: 20px;
       }
 
-      #app-title-bar {
-        width: 100%;
-        height: 50px;
-        background-color: #ffffff;
-        border: 2px solid #024466;
-        border-radius: 8px;
+      .incoming-photo {
+        background: white;
+        border: 1px solid #eee9dd;
+        border-radius: 13px;
+        padding: 12px;
+        min-height: 195px;
+        box-shadow: 0 5px 18px rgba(0, 0, 0, 0.045);
+        cursor: pointer;
+        transition:
+          transform 0.18s,
+          box-shadow 0.18s;
         display: flex;
+        flex-direction: column;
         align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 10px rgba(2, 68, 102, 0.1);
-      }
-      #app-title-bar h1 {
-        margin: 0;
-        font-size: 1.15rem;
-        font-weight: 900;
-        color: #024466;
-        letter-spacing: 0.5px;
+        gap: 10px;
       }
 
-      .phone-box {
-        border: 2px dashed #aaa;
-        background-color: #fff;
+      .incoming-photo:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 9px 22px rgba(0, 0, 0, 0.1);
+      }
+
+      .incoming-photo img {
+        width: 100%;
         height: 180px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        cursor: grab;
-        border-radius: 8px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-      }
-      .phone-box img {
-        max-width: 90%;
-        max-height: 90%;
-        pointer-events: none;
-      }
-
-      #center-panel {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background-color: #fbf5e7;
-        position: relative;
-      }
-      #canvas-container {
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        border-radius: 8px;
-        overflow: hidden;
-        background: #fff;
-      }
-
-      #deco-modal {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        display: none;
-        align-items: center;
-        justify-content: center;
-        z-index: 100;
-      }
-      .modal-content {
-        background: #fff;
-        padding: 30px;
-        border-radius: 12px;
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-        display: flex;
-        gap: 30px;
-        align-items: center;
-      }
-      .modal-left {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-        align-items: center;
-      }
-
-      #popup-workspace {
-        width: 260px;
-        height: 200px;
-        background: #f9f9f9;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        position: relative;
-        overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      /* 이미지가 작아지지 않도록 max-width, max-height를 100%로 수정 */
-      #popup-preview-img {
-        max-width: 100%;
-        max-height: 100%;
         object-fit: contain;
-        position: absolute;
-        z-index: 1;
         pointer-events: none;
       }
 
-      .popup-sticker {
+      .incoming-original-date {
+        color: #637b79;
+        background: #e7f0eb;
+        border-radius: 7px;
+        padding: 5px 7px;
+        font-size: 11px;
+        text-align: center;
+        line-height: 1.4;
+      }
+      .incoming-photo time {
+        color: #828987;
+        font-size: 12px;
+      }
+
+      #open-locker-btn {
         position: absolute;
-        cursor: grab;
-        user-select: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 66px;
+        height: 170px;
+        background: var(--mint);
+        border: 0;
+        border-radius: 14px 0 0 14px;
+        font-weight: 800;
+        color: #315c59;
+        writing-mode: vertical-rl;
         z-index: 5;
       }
-      .popup-sticker:active {
-        cursor: grabbing;
-      }
 
-      .modal-right {
+      /* 보관함 전체 화면 */
+      #locker-screen {
         display: flex;
         flex-direction: column;
-        gap: 10px;
-      }
-      .modal-right textarea {
-        width: 260px;
-        height: 320px;
-        padding: 15px;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        resize: none;
-        font-family: inherit;
-        font-size: 0.95rem;
-        background-color: #faf9f5;
-        outline: none;
+        background: var(--mint);
+        padding: 16px 22px 14px;
       }
 
-      .sticker-container {
+      #locker-header {
+        flex: 0 0 65px;
         display: flex;
-        gap: 10px;
+        align-items: center;
+        gap: 20px;
       }
-      .sticker-btn {
-        background-color: #f4f4f4;
-        border: 1px solid #ddd;
-        font-size: 0.9rem;
+
+      #locker-header h2 {
+        margin: 0;
+        font-size: 24px;
+      }
+
+      #locker-header small {
+        color: #57716c;
+      }
+
+      #back-btn {
+        border: 2px solid #779a92;
+        border-radius: 9px;
+        background: white;
+        color: #315b58;
+        padding: 10px 16px;
         font-weight: bold;
-        padding: 8px 12px;
-        border-radius: 5px;
-        cursor: pointer;
-        color: #333;
-      }
-      .sticker-btn:hover {
-        background-color: #e0e0e0;
       }
 
-      input[type="text"] {
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        width: 100%;
-        outline: none;
-      }
-      button {
-        padding: 10px 20px;
-        cursor: pointer;
-        font-weight: bold;
-        border: none;
-        border-radius: 5px;
-        background-color: #4caf50;
-        color: white;
-        transition: 0.2s;
-      }
-      #fix-btn {
-        background-color: #ff9800;
-        width: 100%;
-      }
-
-      #right-panel {
-        width: 320px;
-        border-left: 2px solid #e0dacc;
-        padding: 20px;
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        background-color: #c4d9d4;
-      }
-      #locker-container {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        margin-bottom: 20px;
-      }
       #locker {
-        flex: 1;
         position: relative;
+        flex: 1;
+        min-height: 0;
         overflow: hidden;
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.3);
-        border: 2px dashed rgba(255, 255, 255, 0.6);
+        border: 3px dashed rgba(255, 255, 255, 0.85);
+        background: rgba(255, 255, 255, 0.28);
+        border-radius: 15px;
       }
 
       .saved-item {
         position: absolute;
-        width: 100px;
-        height: 100px;
-        padding: 10px;
-        background-color: #fff;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: grab;
+        padding: 0;
+        border: none;
+        background: transparent;
         transform-origin: center center;
+        cursor: grab;
+        user-select: none;
+        overflow: visible;
       }
+
       .saved-item img {
-        max-width: 100%;
-        max-height: 100%;
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
         pointer-events: none;
       }
 
       .locker-label {
         position: absolute;
-        top: -15px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #fffacd;
-        border: 1px solid #d4c879;
-        padding: 4px 10px;
-        border-radius: 4px;
-        font-size: 0.8rem;
-        color: #333;
-        font-weight: bold;
-        white-space: nowrap;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        background: url("./라벨@3x.png") center / 100% 100% no-repeat;
+        color: #25384a;
+        font-weight: 800;
+        font-size: 13px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 2px 7px 2px 26px;
         pointer-events: none;
-        z-index: 10;
+        transform-origin: center;
+        white-space: nowrap;
       }
 
-      #trash-bin {
-        height: 80px;
-        background-color: transparent;
+      .locker-label span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* 편집 모달 */
+      #deco-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(18, 27, 35, 0.6);
+        z-index: 100;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        padding: 16px;
+      }
+
+      #deco-modal.open {
+        display: flex;
+      }
+
+      .modal-content {
+        display: flex;
+        gap: 24px;
+        padding: 28px;
+        background: white;
+        border-radius: 16px;
+        max-height: 95dvh;
+        max-width: 96vw;
+        overflow: auto;
+        box-shadow: 0 16px 45px rgba(0, 0, 0, 0.2);
+      }
+
+      .modal-left {
+        width: 460px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      #memo-input {
+        padding: 13px;
+        width: 100%;
+        border: 1px solid #ccc;
         border-radius: 8px;
+      }
+
+      #popup-workspace-wrap {
+        width: 460px;
+        height: 390px;
+        max-width: 100%;
+        background: #f7f7f5;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      #popup-workspace {
+        position: relative;
+        width: 320px;
+        height: 280px;
+        touch-action: none;
+      }
+
+      #popup-preview-img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: contain;
+        user-select: none;
+        pointer-events: none;
+      }
+
+      .popup-sticker {
+        width: 40px;
+        height: 40px;
+        position: absolute;
+        cursor: grab;
+        touch-action: none;
+        z-index: 3;
+      }
+
+      .popup-sticker.rect {
+        background: rgba(240, 99, 99, 0.85);
+      }
+
+      .popup-sticker.circle {
+        background: rgba(251, 205, 61, 0.85);
+        border-radius: 50%;
+      }
+
+      .popup-sticker.triangle {
+        background: rgba(103, 138, 255, 0.85);
+        clip-path: polygon(50% 0, 0 100%, 100% 100%);
+      }
+
+      .sticker-container {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .sticker-btn {
+        border: 1px solid #ddd;
+        border-radius: 7px;
+        background: #f4f4f4;
+        padding: 11px;
+      }
+
+      #fix-btn {
+        padding: 15px;
+        border: 0;
+        border-radius: 9px;
+        background: #dea85f;
+        color: white;
+        font-weight: 800;
+      }
+
+      #fix-btn:disabled {
+        opacity: 0.5;
+        cursor: wait;
+      }
+
+      .modal-right {
+        display: flex;
+        flex-direction: column;
+        width: 280px;
+        gap: 12px;
+      }
+
+      #close-modal {
+        align-self: flex-end;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 14px;
+        background: #eee;
+      }
+
+      #long-memo-input {
+        flex: 1;
+        min-height: 280px;
+        width: 100%;
+        padding: 15px;
+        resize: none;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background: #fafaf8;
+      }
+
+      #status-toast {
+        position: fixed;
+        left: 50%;
+        bottom: 22px;
+        transform: translateX(-50%);
+        background: #283e4c;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 9px;
+        z-index: 200;
+        display: none;
+      }
+
+      @media (max-width: 800px) {
+        #work-header {
+          padding-left: 14px;
+        }
+        #work-header p {
+          display: none;
+        }
+        #incoming-scroll {
+          padding: 20px 75px 30px 16px;
+        }
+        .photo-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .modal-content {
+          flex-direction: column;
+        }
+        .modal-left {
+          width: 100%;
+        }
+        .modal-right {
+          width: 100%;
+        }
+        #popup-workspace-wrap {
+          width: 100%;
+        }
+        #long-memo-input {
+          min-height: 130px;
+        }
+      }
+
+      /* 시간별 보관함: 고정된 물리 공간 */
+
+      #locker {
+        flex: 1 1 auto;
+        height: auto;
+        min-height: 0;
+
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+
+        padding: 22px;
+        display: block;
+      }
+
+      #locker-screen {
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      /* 시간별 구획 */
+      .locker-hour-group {
+        position: relative;
+        width: 100%;
+        margin-bottom: 35px;
+      }
+
+      .locker-hour-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+
+        color: #244665;
+        font-size: 17px;
+        font-weight: 800;
+      }
+
+      .locker-hour-count {
+        font-size: 13px;
+        color: #718580;
+        font-weight: normal;
+      }
+
+      /* 각 시간대의 독립된 물리 공간 */
+      .locker-hour-space {
+        position: relative;
+        width: 100%;
+        height: 370px;
+
+        overflow: hidden;
+        contain: layout paint;
+        isolation: isolate;
+
+        border: 2px dashed rgba(255, 255, 255, 0.9);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.22);
+      }
+
+      /* 사진의 움직임이 스크롤 높이에 영향을 주지 않도록 */
+      .locker-hour-space .saved-item {
+        position: absolute;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* =========================
+   보관함: 일별 카드형 레이아웃
+   ========================= */
+
+      #locker-screen {
+        overflow: hidden;
+      }
+
+      #locker {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+
+        padding: 8px 6px 18px;
+        border: none;
+        background: transparent;
+        border-radius: 0;
+      }
+
+      .locker-day-group {
+        margin-bottom: 28px;
+      }
+
+      .locker-day-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 12px;
+        padding: 0 4px;
+
+        color: #244665;
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .locker-day-count {
+        font-size: 12px;
+        font-weight: 600;
+        color: #7a8b88;
+      }
+
+      .locker-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(122px, 1fr));
+        gap: 14px;
+      }
+
+      .locker-card {
+        background: rgba(255, 255, 255, 0.96);
+        border: 1px solid rgba(36, 70, 101, 0.08);
+        border-radius: 14px;
+        padding: 8px;
+
+        box-shadow: 0 5px 14px rgba(0, 0, 0, 0.05);
+        cursor: grab;
+        user-select: none;
+
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          opacity 0.15s ease;
+      }
+
+      .locker-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+      }
+
+      .locker-card.dragging {
+        opacity: 0.55;
+      }
+
+      .locker-card-thumb-wrap {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #eef2f0;
+      }
+
+      .locker-card img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+      }
+
+      .locker-card-meta {
+        padding-top: 8px;
+      }
+
+      .locker-card-title {
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.3;
+        color: #244665;
+        word-break: keep-all;
+
+        min-height: 32px;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+      }
+
+      .locker-card-time {
+        margin-top: 4px;
+        font-size: 11px;
+        color: #7b8786;
+      }
+
+      #locker-empty-message {
+        padding: 70px 10px;
+        text-align: center;
+        font-size: 15px;
+        color: #7a8a86;
+      }
+
+      /* =========================================
+   날짜별 보관함 + 오늘의 메모
+========================================= */
+
+      /* 좌측 보관함과 우측 추억 패널 */
+      #locker-content {
+        display: flex;
+        flex: 1 1 auto;
+        min-height: 0;
+        min-width: 0;
+        gap: 20px;
+        overflow: hidden;
+      }
+
+      /* 기존 날짜별 보관함 */
+      #locker-content #locker {
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 0;
+        height: auto;
+        max-height: none;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
+      /* 오른쪽 패널 */
+      #daily-memory-panel {
+        width: 325px;
+        flex: 0 0 325px;
+        min-height: 0;
+
+        display: flex;
+        flex-direction: column;
+
+        padding: 24px 22px;
+        background: #fffdf6;
+        border: 1px solid #e8e2d2;
+        border-radius: 18px;
+        box-shadow: 0 5px 22px rgba(0, 0, 0, 0.045);
+        overflow: hidden;
+      }
+
+      .daily-memory-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .daily-memory-eyebrow {
+        color: #b69c70;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 1.6px;
+      }
+
+      .daily-memory-header h3 {
+        margin: 8px 0 0;
+        font-size: 22px;
+        color: #244665;
+      }
+
+      .daily-memory-description {
+        margin: 12px 0 20px;
+        font-size: 13px;
+        color: #84918c;
+      }
+
+      /* 실제 메모가 표시되는 공간 */
+      #daily-memory-content {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+      }
+
+      .daily-memory-photo {
+        display: block;
+        width: 100%;
+        max-height: 250px;
+        object-fit: contain;
+
+        background: #f0f2eb;
+        border-radius: 12px;
+        cursor: pointer;
+      }
+
+      .daily-memory-title {
+        margin: 18px 0 8px;
+        font-size: 19px;
+        font-weight: 800;
+        color: #244665;
+        overflow-wrap: anywhere;
+      }
+
+      .daily-memory-date {
+        margin-bottom: 18px;
+        color: #989e96;
+        font-size: 12px;
+      }
+
+      /* 상세 메모 */
+      .daily-memory-body {
+        padding: 15px;
+        border-radius: 11px;
+        background: #f6f4ea;
+
+        font-size: 14px;
+        line-height: 1.75;
+        color: #46565d;
+
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .daily-memory-empty {
+        padding: 35px 10px;
+        text-align: center;
+        color: #9b9f97;
+        font-size: 14px;
+        line-height: 1.8;
+      }
+
+      /* 다른 추억 보기 */
+      #daily-memory-shuffle {
+        flex: 0 0 auto;
+        width: 100%;
+        margin-top: 18px;
+        padding: 13px;
+
+        border: 1px solid #d9c39e;
+        border-radius: 10px;
+        background: #fff5d5;
+
+        font-size: 13px;
+        font-weight: 800;
+        color: #6e5a37;
+
+        transition: background 0.2s;
+      }
+
+      #daily-memory-shuffle:hover {
+        background: #f9e6b6;
+      }
+
+      #daily-memory-shuffle:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      /* 창이 좁아지는 경우 */
+      @media (max-width: 850px) {
+        #locker-content {
+          flex-direction: column;
+          overflow-y: auto;
+        }
+
+        #locker-content #locker {
+          flex: 0 0 auto;
+          min-height: 260px;
+          overflow: visible;
+        }
+
+        #daily-memory-panel {
+          flex: 0 0 auto;
+          width: 100%;
+          min-height: 320px;
+          overflow: visible;
+        }
+
+        #daily-memory-content {
+          overflow: visible;
+        }
+      }
+
+      /* 태블릿/터치 UI 및 메인 촬영 버튼 */
+      #photo-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-left: auto;
+      }
+      #photo-actions input[type="file"] {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        overflow: hidden;
+      }
+      .photo-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 10px 16px;
+        border-radius: 10px;
+        background: #fff;
+        border: 2px solid #244665;
+        color: #244665;
+        font-size: 14px;
+        font-weight: 800;
+        white-space: nowrap;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      .photo-action-primary {
+        background: #244665;
+        color: white;
+      }
+      .photo-action:active {
+        transform: scale(0.98);
+      }
+      .incoming-photo,
+      .locker-card,
+      .daily-memory-photo {
+        touch-action: pan-y;
+      }
+      button,
+      .sticker-btn,
+      #back-btn,
+      #open-locker-btn {
+        touch-action: manipulation;
+      }
+      @media (max-width: 1050px) {
+        #work-header {
+          height: auto;
+          min-height: 94px;
+          flex-wrap: wrap;
+          padding: 12px 84px 12px 16px;
+          gap: 10px;
+        }
+        #work-header p {
+          display: none;
+        }
+        #photo-actions {
+          margin-left: 0;
+        }
+        #incoming-scroll {
+          padding: 20px 74px 30px 18px;
+        }
+        .modal-content {
+          max-width: 96vw;
+          padding: 18px;
+          gap: 14px;
+        }
+        .modal-left {
+          width: min(54vw, 460px);
+          min-width: 0;
+        }
+        .modal-right {
+          width: min(32vw, 280px);
+          min-width: 0;
+        }
+        #popup-workspace-wrap {
+          width: 100%;
+        }
+        #locker-content {
+          gap: 12px;
+        }
+        #daily-memory-panel {
+          width: 270px;
+          flex-basis: 270px;
+          padding: 16px;
+        }
+      }
+      @media (max-width: 680px) {
+        #work-header {
+          padding-right: 16px;
+        }
+        #app-title {
+          font-size: 18px;
+          padding: 10px;
+        }
+        #photo-actions {
+          width: 100%;
+        }
+        .photo-action {
+          flex: 1;
+          font-size: 12px;
+          padding: 9px;
+        }
+        #open-locker-btn {
+          width: 48px;
+        }
+        .modal-content {
+          flex-direction: column;
+          width: 100%;
+        }
+        .modal-left,
+        .modal-right {
+          width: 100%;
+        }
+        #popup-workspace-wrap {
+          height: min(38vh, 320px);
+        }
+        #long-memo-input {
+          min-height: 100px;
+        }
+      }
+
+      /* 최종 세로형 사진과 메모 편집기 */
+      #deco-modal {
+        position: fixed;
+        inset: 0;
+        top: var(--visible-top, 0px);
+        height: var(--visible-height, 100dvh);
+        bottom: auto;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        padding: 10px;
+        overflow: hidden;
+      }
+      #deco-modal.open {
+        display: flex;
+      }
+      #deco-modal .modal-content {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        width: min(760px, 98vw);
+        max-width: 98vw;
+        max-height: calc(var(--visible-height, 100dvh) - 20px);
+        padding: 18px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+      }
+      .memo-editor-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .memo-editor-header h2 {
+        color: #244665;
+        font-size: 20px;
+        margin: 0;
+      }
+      #deco-modal #close-modal {
+        align-self: auto;
+      }
+      #deco-modal #memo-input {
+        flex: none;
+        min-height: 48px;
+        width: 100%;
+      }
+      #deco-modal #popup-workspace-wrap {
+        width: 100%;
+        max-width: 100%;
+        height: clamp(180px, 39vh, 420px);
+        flex: none;
+        overflow: hidden;
+        padding: 0;
+      }
+      #deco-modal #popup-workspace {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        cursor: zoom-in;
+      }
+      #deco-modal #popup-preview-img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+        pointer-events: none;
+      }
+      .memo-writing-section {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+        min-width: 0;
+      }
+      .memo-writing-section h3 {
+        margin: 2px 0;
+        font-size: 17px;
+      }
+      #deco-modal #memo-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        padding: 9px;
+        position: sticky;
+        top: 0;
+        z-index: 8;
+        flex: none;
+        max-height: none;
+        overflow: visible;
+        background: #f5f5f1;
+        border: 1px solid #deded8;
+        border-radius: 10px;
+      }
+      #memo-size-buttons,
+      .memo-color-group {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 5px;
+      }
+      .memo-size-btn,
+      .format-btn {
+        padding: 7px 9px;
+        min-height: 40px;
+        border: 1px solid #d5d9d7;
+        border-radius: 7px;
+        background: #fff;
+        color: #263448;
+        font-size: 12px;
+      }
+      .memo-color {
+        width: 27px;
+        height: 27px;
+        border: 2px solid white;
+        outline: 1px solid #d7d7d7;
+        border-radius: 50%;
+        background: var(--swatch);
+      }
+      #deco-modal #long-memo-input {
+        display: block;
+        width: 100%;
+        flex: none;
+        min-height: 270px;
+        max-height: none;
+        height: auto;
+        overflow: visible;
+        padding: 16px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        background: #fafaf8;
+        font-size: 16px;
+        line-height: 1.65;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        outline: none;
+        user-select: text;
+        -webkit-user-select: text;
+        touch-action: pan-y;
+      }
+      #long-memo-input:empty::before {
+        content: attr(data-placeholder);
+        color: #aaa;
+        pointer-events: none;
+      }
+      #deco-modal #fix-btn {
+        width: 100%;
+        min-height: 52px;
+        flex: none;
+      }
+      #long-memo-input .memo-task,
+      .daily-memory-body .memo-task {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin: 2px 0;
+        padding: 0;
+      }
+      #long-memo-input .memo-task input,
+      .daily-memory-body .memo-task input {
+        margin: 4px 0 0;
+        width: 19px;
+        height: 19px;
+        flex: 0 0 19px;
+        accent-color: #729c94;
+      }
+      #long-memo-input .memo-task > span,
+      .daily-memory-body .memo-task > span {
+        flex: 1;
+        min-width: 0;
+        outline: none;
+      }
+      .memo-task input:checked + span {
+        text-decoration: line-through;
+        color: #999;
+      }
+      #long-memo-input ul,
+      #long-memo-input ol,
+      .daily-memory-body ul,
+      .daily-memory-body ol {
+        padding-left: 25px;
+      }
+      #long-memo-input font[size="7"],
+      .daily-memory-body font[size="7"] {
+        font-size: 32px;
+      }
+      #long-memo-input font[size="5"],
+      .daily-memory-body font[size="5"] {
+        font-size: 24px;
+      }
+      #long-memo-input font[size="3"],
+      .daily-memory-body font[size="3"] {
+        font-size: 16px;
+      }
+      #long-memo-input font[size="2"],
+      .daily-memory-body font[size="2"] {
+        font-size: 12px;
+      }
+      #photo-viewer {
+        position: fixed;
+        inset: 0;
+        z-index: 5000;
+        display: none;
+        background: #0b1017;
+      }
+      #photo-viewer.open {
+        display: flex;
+      }
+      #photo-viewer-stage {
+        width: 100%;
+        height: 100%;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.2s;
-        border: 2px dashed transparent;
+        overflow: hidden;
+        touch-action: none;
+        cursor: grab;
       }
-      #trash-bin.drag-over {
-        background-color: rgba(255, 0, 0, 0.1);
-        border-color: #ff4c4c;
+      #photo-viewer-image {
+        display: block;
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        pointer-events: none;
+        user-select: none;
+        transform-origin: center;
+      }
+      #photo-viewer-close {
+        position: absolute;
+        z-index: 5;
+        right: max(16px, env(safe-area-inset-right));
+        top: max(16px, env(safe-area-inset-top));
+        width: 50px;
+        height: 50px;
+        border: 0;
+        border-radius: 50%;
+        color: white;
+        background: #ffffff30;
+        font-size: 22px;
+      }
+      #locker-search-tools {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      #locker-search,
+      #locker-date,
+      #locker-filter-reset {
+        min-height: 44px;
+        min-width: 0;
+        border: 1px solid #9eb8b1;
+        border-radius: 9px;
+        padding: 8px 10px;
+        color: #244665;
+        background: white;
+      }
+      #locker-search {
+        width: 185px;
+      }
+      #locker-date {
+        width: 145px;
+      }
+      @media (max-width: 1050px) {
+        #locker-header {
+          flex-wrap: wrap;
+          height: auto;
+          flex-basis: auto;
+          gap: 8px;
+          padding-bottom: 10px;
+        }
+        #locker-header small {
+          display: none;
+        }
+        #locker-search-tools {
+          margin-left: auto;
+        }
+        #deco-modal #popup-workspace-wrap {
+          height: clamp(140px, 33vh, 300px);
+        }
+      }
+      @media (max-width: 680px) {
+        #locker-search-tools {
+          width: 100%;
+          margin-left: 0;
+        }
+        #locker-search {
+          flex: 1;
+          width: auto;
+        }
+        #locker-date {
+          width: 115px;
+        }
+        #deco-modal .modal-content {
+          padding: 12px;
+          gap: 10px;
+        }
+        #deco-modal #popup-workspace-wrap {
+          height: 28vh;
+          min-height: 110px;
+        }
+        #deco-modal #long-memo-input {
+          min-height: 210px;
+        }
+      }
+      body.memo-keyboard-open #deco-modal #popup-workspace-wrap {
+        height: 110px;
+        min-height: 90px;
+      }
+
+      /* 촬영 날짜 선택 팝업 */
+      #photo-date-modal[hidden],
+      #date-calendar-panel[hidden],
+      #date-manual-panel[hidden],
+      #photo-date-error[hidden] {
+        display: none !important;
+      }
+
+      #photo-date-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        background: rgba(18, 31, 40, 0.65);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+
+      .photo-date-dialog {
+        width: min(100%, 420px);
+        max-height: 90dvh;
+        overflow-y: auto;
+        background: #fffdf8;
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.24);
+        color: #244665;
+      }
+
+      #photo-date-message {
+        font-size: 17px;
+        font-weight: 700;
+        line-height: 1.5;
+        margin: 0 0 20px;
+      }
+
+      .photo-date-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+
+      .photo-date-tabs button {
+        padding: 12px 6px;
+        background: #edf2ee;
+        border: 1px solid #cfdbd6;
+        border-radius: 9px;
+        color: #244665;
+        font-weight: 600;
+      }
+
+      .photo-date-tabs button.active {
+        background: #244665;
+        color: white;
+      }
+
+      #date-calendar-panel,
+      #date-manual-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      #date-calendar-panel label,
+      #date-manual-panel label {
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      #photo-date-calendar,
+      #photo-date-time,
+      #photo-date-text {
+        width: 100%;
+        min-height: 46px;
+        padding: 10px 12px;
+        border: 1px solid #b9cbc5;
+        border-radius: 9px;
+        background: white;
+        color: #244665;
+        font-size: 16px;
+        box-sizing: border-box;
+      }
+
+      #date-manual-panel small {
+        color: #70827c;
+        font-size: 12px;
+      }
+
+      #photo-date-error {
+        margin: 12px 0 0;
+        color: #c13636;
+        font-size: 13px;
+      }
+
+      .photo-date-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 9px;
+        margin-top: 22px;
+      }
+
+      .photo-date-actions button {
+        min-height: 44px;
+        padding: 10px 16px;
+        border-radius: 9px;
+        border: 1px solid #b9cbc5;
+        background: white;
+        color: #244665;
+        font-weight: 700;
+      }
+
+      #photo-date-confirm {
+        background: #244665;
+        color: white;
+        border-color: #244665;
+      }
+
+      @media (max-width: 680px) {
+        .photo-date-dialog {
+          padding: 18px;
+        }
+      }
+
+      /* =====================================
+   날짜 입력칸 + 달력 버튼 통합
+===================================== */
+
+      .photo-date-combined {
+        position: relative;
+        display: flex;
+        align-items: center;
+        width: 100%;
+        margin: 8px 0 18px;
+        background: white;
+        border: 1px solid #b9cbc5;
+        border-radius: 9px;
+        overflow: hidden;
+      }
+
+      #photo-date-text {
+        flex: 1;
+        min-width: 0;
+        min-height: 48px;
+        padding: 10px 12px;
+        border: none;
+        outline: none;
+        background: transparent;
+        color: #244665;
+        font-size: 16px;
+        margin: 0;
+      }
+
+      /* 달력 아이콘 */
+      #photo-date-picker-button {
+        position: relative;
+        z-index: 2;
+        flex-shrink: 0;
+        width: 52px;
+        height: 48px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border: 0;
+        border-left: 1px solid #e0e7e3;
+        background: #f3f6f4;
+        color: #244665;
+        cursor: pointer;
+      }
+
+      /* 실제 달력 선택기는 버튼 영역에만 겹쳐놓음 */
+      #photo-date-calendar {
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: 52px;
+        height: 48px;
+        opacity: 0;
+        z-index: 3;
+        cursor: pointer;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* 이전 CSS의 입력칸 공통 스타일보다 우선 적용 */
+      #photo-date-modal #photo-date-text {
+        border: none;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      #photo-date-modal #photo-date-time {
+        width: 100%;
+        margin-top: 8px;
+      }
+
+      /* 이전 탭 UI가 남아 있더라도 표시하지 않음 */
+      .photo-date-tabs,
+      #date-manual-panel,
+      #date-calendar-panel {
+        display: none !important;
+      }
+
+      /* 날짜 직접 입력 + 달력 통합 UI */
+      #photo-date-modal .photo-date-combined {
+        display: flex;
+        position: relative;
+        align-items: center;
+        overflow: hidden;
+        height: 50px;
+        background: white;
+        border: 1px solid #b9cbc5;
+        border-radius: 10px;
+      }
+
+      #photo-date-display {
+        position: absolute;
+        left: 12px;
+        right: 53px;
+        top: 0;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        pointer-events: none;
+        font-size: 19px;
+        font-family: monospace;
+        letter-spacing: 0;
+        white-space: nowrap;
+      }
+
+      #photo-date-display span {
+        color: #244665;
+      }
+
+      #photo-date-display span.empty {
+        color: #b9c3c0;
+      }
+
+      #photo-date-display span.active {
+        text-decoration: underline;
+        text-decoration-color: #3977db;
+        text-underline-offset: 4px;
+      }
+
+      #photo-date-modal #photo-date-text {
+        position: relative;
+        z-index: 1;
+        flex: 1;
+        width: 100%;
+        min-width: 0;
+        height: 100%;
+        margin: 0;
+        padding: 0 12px;
+        border: 0;
+        outline: none;
+        background: transparent;
+        color: transparent;
+        -webkit-text-fill-color: transparent;
+        caret-color: transparent;
+        font-size: 19px;
+        font-family: monospace;
+        letter-spacing: 0;
+      }
+
+      /* 달력 아이콘 터치 영역 */
+      .photo-date-calendar-area {
+        position: relative;
+        flex: 0 0 52px;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f3f6f4;
+        border-left: 1px solid #e0e7e3;
+        color: #244665;
+      }
+
+      /* date 입력 자체가 터치를 받음 */
+      #photo-date-modal #photo-date-calendar {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0.01;
+        z-index: 2;
+        cursor: pointer;
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+
+      #photo-date-calendar::-webkit-calendar-picker-indicator {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        padding: 0;
+        margin: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+
+      /* =====================================
+   메인 화면 날짜별 그룹
+   기존 메인 화면 색상 유지
+===================================== */
+
+      .incoming-day-group {
+        margin-bottom: 28px;
+      }
+
+      .incoming-day-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+
+        margin: 0 0 12px;
+        padding: 0 4px;
+
+        /* 기존 메인 화면 글씨 색상 유지 */
+        color: inherit;
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .incoming-day-count {
+        color: #90958f;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      /* 보관함처럼 날짜별 구역을 분리 */
+      .incoming-day-group + .incoming-day-group {
+        padding-top: 12px;
+        border-top: 1px solid #d5d5cb;
+      }
+
+      /* ==========================================
+   공통 메모 다중 선택 편집 모드
+========================================== */
+
+      /* 편집 중: 모든 사진을 살짝 투명하게 */
+      .batch-select-mode .incoming-photo,
+      .batch-select-mode .locker-card {
+        opacity: 0.48;
+        transition: opacity 0.15s ease;
+        cursor: pointer;
+        -webkit-touch-callout: none;
+      }
+
+      /* 선택된 사진은 원래 색상 */
+      .batch-select-mode .incoming-photo.batch-selected,
+      .batch-select-mode .locker-card.batch-selected {
+        opacity: 1;
+      }
+
+      /* 카드 위 선택 표시 */
+      .incoming-photo,
+      .locker-card {
+        position: relative;
+      }
+
+      .batch-check-mark {
+        display: none;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 8;
+
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+
+        align-items: center;
+        justify-content: center;
+
+        background: #244665;
+        border: 3px solid white;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+        color: white;
+        font-size: 27px;
+        font-weight: bold;
+        pointer-events: none;
+      }
+
+      .batch-selected .batch-check-mark {
+        display: flex;
+      }
+
+      /* 선택 도구: 화면 아래쪽 고정 */
+      #batch-toolbar {
+        display: none;
+        position: fixed;
+        bottom: max(15px, env(safe-area-inset-bottom));
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9500;
+
+        width: min(680px, calc(100vw - 24px));
+        box-sizing: border-box;
+
+        padding: 12px;
+        border-radius: 16px;
+
+        background: #fffdf8;
+        color: #244665;
+        box-shadow: 0 8px 35px rgba(0, 0, 0, 0.22);
+        border: 1px solid #d6dfda;
+      }
+
+      body.batch-select-mode #batch-toolbar {
+        display: block;
+      }
+
+      .batch-toolbar-top,
+      .batch-toolbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .batch-toolbar-top {
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+
+      #batch-selected-count {
+        font-weight: 800;
+        font-size: 15px;
+      }
+
+      #batch-toolbar button {
+        min-height: 43px;
+        padding: 9px 12px;
+        border: 1px solid #b5c7c0;
+        border-radius: 9px;
+        background: white;
+        color: #244665;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .batch-toolbar-actions button {
+        flex: 1;
+      }
+
+      #batch-delete-btn {
+        background: #b84343 !important;
+        border-color: #b84343 !important;
+        color: white !important;
+      }
+
+      #batch-toolbar button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      /* 날짜변경 / 삭제 확인창 */
+      .batch-dialog-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        background: rgba(10, 20, 28, 0.62);
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+
+      .batch-dialog-backdrop[hidden] {
+        display: none !important;
+      }
+
+      .batch-dialog {
+        width: min(410px, 100%);
+        background: #fffdf8;
+        color: #244665;
+        border-radius: 17px;
+        padding: 23px;
+        box-sizing: border-box;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+      }
+
+      .batch-dialog h3 {
+        margin: 0 0 12px;
+        font-size: 19px;
+      }
+
+      .batch-dialog p {
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .batch-dialog input[type="date"] {
+        display: block;
+        width: 100%;
+        min-height: 48px;
+        margin: 13px 0;
+        padding: 8px;
+        font-size: 16px;
+        box-sizing: border-box;
+        border: 1px solid #b5c7c0;
+        border-radius: 9px;
+      }
+
+      .batch-dialog-buttons {
+        display: flex;
+        gap: 9px;
+        justify-content: flex-end;
+        margin-top: 20px;
+      }
+
+      .batch-dialog-buttons button {
+        min-height: 44px;
+        padding: 10px 16px;
+        border-radius: 9px;
+        border: 1px solid #b5c7c0;
+        background: white;
+        color: #244665;
+        font-weight: 700;
+      }
+
+      .batch-dialog-buttons .danger {
+        background: #b84343;
+        border-color: #b84343;
+        color: white;
+      }
+
+      .batch-dialog-buttons .primary {
+        background: #244665;
+        color: white;
+      }
+
+      .batch-never-ask {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        margin-top: 16px;
+        font-size: 12px;
+        color: #78847e;
+      }
+
+      .batch-never-ask input {
+        width: 17px;
+        height: 17px;
+      }
+
+      @media (max-width: 680px) {
+        #batch-toolbar {
+          padding: 10px;
+        }
+
+        #batch-toolbar button {
+          font-size: 12px;
+          padding: 8px;
+        }
+      }
+
+      /* =====================================
+   모바일 길게 누르기 기본 메뉴 방지
+===================================== */
+
+      /* 메인 화면 + 보관함 사진 */
+      .incoming-photo,
+      .locker-card,
+      .incoming-photo img,
+      .locker-card img {
+        -webkit-touch-callout: none !important;
+        -webkit-user-select: none !important;
+        user-select: none !important;
+      }
+
+      /* 사진 위에서 브라우저 기본 이미지 드래그 방지 */
+      .incoming-photo img,
+      .locker-card img {
+        -webkit-user-drag: none;
+        pointer-events: none;
+      }
+
+      /* 터치 스크롤은 정상 유지 */
+      .incoming-photo,
+      .locker-card {
+        touch-action: pan-x pan-y;
+      }
+
+      /* =====================================
+   보관함 왼쪽 이동 버튼
+===================================== */
+
+      #locker-screen {
+        position: relative;
+      }
+
+      /* 기존 버튼 스타일 덮어쓰기 */
+      #locker-screen #back-btn {
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+
+        width: 66px;
+        height: 170px;
+        padding: 12px 8px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+
+        background: var(--cream);
+        color: #315c59;
+
+        border: 0;
+        border-radius: 0 14px 14px 0;
+
+        font-size: 14px;
+        font-weight: 800;
+        cursor: pointer;
+
+        z-index: 10;
+      }
+
+      /* 왼쪽 버튼이 보관함 카드와 겹치지 않도록 여백 확보 */
+      #locker-screen #locker-content {
+        margin-left: 48px;
+        min-width: 0;
+      }
+
+      /* 모바일에서는 버튼을 조금 작게 */
+      @media (max-width: 680px) {
+        #locker-screen #back-btn {
+          width: 45px;
+          height: 135px;
+          font-size: 12px;
+        }
+
+        #locker-screen #locker-content {
+          margin-left: 32px;
+        }
+      }
+
+      /* 브라우저의 가로 스와이프 히스토리 동작 최소화 */
+      html,
+      body,
+      #viewport {
+        overscroll-behavior-x: none;
       }
     </style>
   </head>
-  <body>
-    <script>
-      function startDrag(event, type, value, fbKey) {
-        event.dataTransfer.setData("type", type);
-        event.dataTransfer.setData("value", value);
-        if (fbKey) event.dataTransfer.setData("fbKey", fbKey);
-      }
-    </script>
 
-    <div id="left-panel">
-      <div id="app-title-bar">
-        <h1>Capture to Memo!</h1>
+  <body>
+    <div id="viewport">
+      <div id="screen-track">
+        <!-- 메인 사진 수신 화면 -->
+        <section id="work-screen" class="screen">
+          <header id="work-header">
+            <div id="app-title">Capture to Memo!</div>
+            <p>사진을 터치하거나 두 번 클릭해 메모로 만들어 보세요.</p>
+            <div id="photo-actions">
+              <label
+                class="photo-action photo-action-primary"
+                for="main-camera-input"
+              >
+                📷 사진 찍기
+              </label>
+              <input
+                id="main-camera-input"
+                type="file"
+                accept="image/*"
+                capture="environment"
+              />
+              <label class="photo-action" for="main-gallery-input">
+                이미지 불러오기
+              </label>
+              <input id="main-gallery-input" type="file" accept="image/*" />
+            </div>
+          </header>
+
+          <main id="incoming-scroll">
+            <div id="incoming-list"></div>
+            <div id="empty-message">아직 도착한 사진이 없어요.</div>
+          </main>
+
+          <button id="open-locker-btn">보관함 열기 ❯</button>
+        </section>
+
+        <!-- 보관함 화면 -->
+        <section id="locker-screen" class="screen">
+          <!-- 왼쪽 가장자리의 작업대 이동 버튼 -->
+          <button type="button" id="back-btn" aria-label="작업대로 돌아가기">
+            ❮ 작업대로
+          </button>
+
+          <header id="locker-header">
+            <h2>나의 보관함</h2>
+
+            <!-- 나머지 기존 검색창, 달력 등의 코드는 그대로 유지 -->
+          </header>
+
+          <!-- 기존 보관함 본문도 그대로 유지 -->
+
+          <!-- 보관함 본문: 날짜별 목록 + 오늘의 메모 -->
+          <div id="locker-content">
+            <!-- 기존 날짜별 보관함 -->
+            <div id="locker"></div>
+
+            <!-- 오른쪽 오늘의 메모 -->
+            <aside id="daily-memory-panel">
+              <div class="daily-memory-header">
+                <div>
+                  <span class="daily-memory-eyebrow">MEMORY OF THE DAY</span>
+                  <h3>✨ 오늘의 메모</h3>
+                </div>
+              </div>
+
+              <p class="daily-memory-description">
+                잊고 있던 순간을 다시 만나보세요.
+              </p>
+
+              <div id="daily-memory-content">
+                <p class="daily-memory-empty">지난 추억을 찾고 있어요...</p>
+              </div>
+
+              <button
+                id="daily-memory-shuffle"
+                type="button"
+                onclick="showRandomMemory(true)"
+              >
+                ↻ 다른 추억 보기
+              </button>
+            </aside>
+          </div>
+        </section>
       </div>
-      <div
-        id="incoming-list"
-        style="
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          flex: 1;
-          overflow-y: auto;
-        "
-      ></div>
     </div>
 
-    <div id="center-panel">
-      <div id="canvas-container"></div>
-
-      <div id="deco-modal">
-        <div class="modal-content">
-          <div class="modal-left">
-            <input
-              type="text"
-              id="memo-input"
-              placeholder="상단 라벨 텍스트 입력"
-              style="width: 260px"
+    <!-- 세로형 사진/메모 편집기 -->
+    <div
+      id="deco-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="사진과 메모 기록"
+    >
+      <div class="modal-content">
+        <div class="memo-editor-header">
+          <h2>사진과 메모 기록</h2>
+          <button id="close-modal" type="button" onclick="closeDecoModal()">
+            ✕ 닫기
+          </button>
+        </div>
+        <input
+          id="memo-input"
+          type="text"
+          maxlength="40"
+          placeholder="제목을 입력해주세요"
+        />
+        <div id="popup-workspace-wrap">
+          <div id="popup-workspace">
+            <img
+              id="popup-preview-img"
+              alt="메모에 저장할 사진"
+              draggable="false"
             />
-
-            <div id="popup-workspace">
-              <img id="popup-preview-img" src="" alt="사물 이미지" />
-            </div>
-
-            <div class="sticker-container">
-              <div class="sticker-btn" onclick="addPopupSticker('rect')">
-                ■ 네모
-              </div>
-              <div class="sticker-btn" onclick="addPopupSticker('triangle')">
-                ▲ 세모
-              </div>
-              <div class="sticker-btn" onclick="addPopupSticker('circle')">
-                ● 동그라미
-              </div>
-            </div>
-            <button id="fix-btn" onclick="fixAndMerge()">🔒 꾸미기 완료</button>
-          </div>
-          <div class="modal-right">
-            <label style="font-size: 0.85rem; font-weight: bold; color: #555"
-              >📝 상세 메모 (장문)</label
-            >
-            <textarea
-              id="long-memo-input"
-              placeholder="이 사물에 대한 이야기를 자유롭게 적어보세요..."
-            ></textarea>
           </div>
         </div>
+        <section class="memo-writing-section">
+          <h3>상세 메모</h3>
+          <div id="memo-toolbar" aria-label="글씨 서식 도구">
+            <button type="button" class="format-btn" data-command="bold">
+              <strong>B</strong>
+            </button>
+            <div id="memo-size-buttons">
+              <button type="button" class="memo-size-btn" data-size="32">
+                매우 크게
+              </button>
+              <button type="button" class="memo-size-btn" data-size="24">
+                크게
+              </button>
+              <button type="button" class="memo-size-btn" data-size="16">
+                중간
+              </button>
+              <button type="button" class="memo-size-btn" data-size="12">
+                작게
+              </button>
+            </div>
+            <div class="memo-color-group">
+              <button
+                type="button"
+                class="memo-color"
+                data-color="#e74d4d"
+                style="--swatch: #e74d4d"
+                aria-label="빨강"
+              ></button>
+              <button
+                type="button"
+                class="memo-color"
+                data-color="#f09537"
+                style="--swatch: #f09537"
+                aria-label="주황"
+              ></button>
+              <button
+                type="button"
+                class="memo-color"
+                data-color="#368a54"
+                style="--swatch: #368a54"
+                aria-label="초록"
+              ></button>
+              <button
+                type="button"
+                class="memo-color"
+                data-color="#3977db"
+                style="--swatch: #3977db"
+                aria-label="파랑"
+              ></button>
+              <button
+                type="button"
+                class="memo-color"
+                data-color="#9254ce"
+                style="--swatch: #9254ce"
+                aria-label="보라"
+              ></button>
+            </div>
+            <button
+              type="button"
+              class="format-btn"
+              data-command="insertUnorderedList"
+            >
+              • 목록
+            </button>
+            <button
+              type="button"
+              class="format-btn"
+              data-command="insertOrderedList"
+            >
+              1. 목록
+            </button>
+            <button type="button" class="format-btn" id="memo-add-checkbox">
+              ☐ 체크
+            </button>
+          </div>
+          <div
+            id="long-memo-input"
+            contenteditable="true"
+            role="textbox"
+            aria-multiline="true"
+            aria-label="상세 메모"
+            data-placeholder="사진에 대한 이야기를 자유롭게 적어보세요..."
+          ></div>
+        </section>
+        <button id="fix-btn" type="button" onclick="fixAndMerge()">
+          보관함에 저장
+        </button>
+      </div>
+    </div>
+    <!-- 사진 전체화면 보기 -->
+    <div id="photo-viewer" aria-hidden="true">
+      <button
+        id="photo-viewer-close"
+        type="button"
+        aria-label="사진 닫기"
+        onclick="closePhotoViewer()"
+      >
+        ✕
+      </button>
+      <div id="photo-viewer-stage">
+        <img id="photo-viewer-image" alt="확대된 사진" draggable="false" />
       </div>
     </div>
 
-    <div id="right-panel">
-      <div id="locker-container">
-        <div id="locker"></div>
-      </div>
-      <div id="trash-bin">
-        <img
-          src="Trash.png"
-          alt="휴지통"
-          style="width: 60px; height: 60px; pointer-events: none"
-        />
-      </div>
-    </div>
+    <div id="status-toast"></div>
 
-    <script src="sketch.js"></script>
+    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -376,28 +2162,87 @@
         appId: "1:244477022912:web:7fa3461abc1c752e345325",
         measurementId: "G-KBN8K062ZR",
       };
-      firebase.initializeApp(firebaseConfig);
+
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+
       window.db = firebase.database();
-
-      window.db.ref("incoming").on("child_added", (snapshot) => {
-        const data = snapshot.val();
-        const fbKey = snapshot.key;
-        const incomingList = document.getElementById("incoming-list");
-
-        const box = document.createElement("div");
-        box.className = "phone-box";
-        box.id = fbKey;
-        box.draggable = true;
-
-        const img = document.createElement("img");
-        img.src = data.image;
-        box.appendChild(img);
-
-        box.ondragstart = function (event) {
-          startDrag(event, "main", data.image, fbKey);
-        };
-        incomingList.prepend(box);
-      });
     </script>
+
+    <!-- 사진 원본의 EXIF 촬영 날짜 읽기 -->
+
+    <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+    <script src="sketch.js"></script>
+
+    <!-- 촬영 날짜 자동 인식 실패 시 표시 -->
+
+    <!-- 사진 날짜 지정 팝업 -->
+    <div id="photo-date-modal" class="photo-date-modal" hidden>
+      <div
+        class="photo-date-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="photo-date-message"
+      >
+        <p id="photo-date-message">
+          언제 생성된 사진인지 확인 할 수 없어요. 저장할 날짜를 입력해주세요!
+        </p>
+
+        <!-- 날짜: 숫자 직접 수정 + 달력 아이콘 -->
+        <label for="photo-date-text">날짜</label>
+
+        <div class="photo-date-combined">
+          <!-- 회색 안내 문자와 실제 숫자를 표시 -->
+          <div id="photo-date-display" aria-hidden="true"></div>
+
+          <!-- 숫자 입력용: 숫자가 없는 곳은 Y/M/D 유지 -->
+          <input
+            type="text"
+            id="photo-date-text"
+            value="YYYY-MM-DD"
+            inputmode="numeric"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="날짜 입력, 년 네 자리 월 두 자리 일 두 자리"
+          />
+
+          <!-- 실제 달력 입력창: 아이콘 영역을 직접 터치 -->
+          <div class="photo-date-calendar-area">
+            <svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="5" width="18" height="16" rx="2" />
+              <path d="M7 3v4M17 3v4M3 10h18" />
+            </svg>
+
+            <input
+              type="date"
+              id="photo-date-calendar"
+              aria-label="달력에서 날짜 선택"
+            />
+          </div>
+        </div>
+
+        <label for="photo-date-time">시간</label>
+        <input type="time" id="photo-date-time" step="60" />
+
+        <p id="photo-date-error" role="alert" hidden></p>
+
+        <div class="photo-date-actions">
+          <button type="button" id="photo-date-cancel">취소</button>
+          <button type="button" id="photo-date-confirm">이 날짜로 저장</button>
+        </div>
+      </div>
+    </div>
   </body>
 </html>
