@@ -1,4 +1,4 @@
-/* Capture to Memo — Album Edition / 2026
+/* Capture to Memo — Album Edition / Integrated 2026
    Firebase 경로는 기존 프로젝트와 동일: incoming, saved_memos
    새 UI: 표지 ↔ 인화실 / 아래에서 올라오는 사진 앨범
 */
@@ -125,37 +125,10 @@ function applyCoverPhotoTilt() {
   if (!host) return;
 
   // 실제 Three.js 책과 겹치지 않도록 서로 다른 위치 / 방향으로 배치
-
   const layouts = [
-    // 1번 사진: 책의 왼쪽 위
-    {
-      left: "51%",
-      top: "23%",
-      rot: 12,
-      rx: 11,
-      ry: -30,
-      scale: 0.7,
-    },
-
-    // 2번 사진: 책의 오른쪽 중간
-    {
-      left: "89%",
-      top: "41%",
-      rot: -10,
-      rx: -10,
-      ry: 23,
-      scale: 1.02,
-    },
-
-    // 3번 사진: 책의 오른쪽 아래
-    {
-      left: "82%",
-      top: "79%",
-      rot: 30,
-      rx: 20,
-      ry: -40,
-      scale: 0.82,
-    },
+    { left: "51%", top: "23%", rot: 12, rx: 11, ry: -30, scale: 0.7 },
+    { left: "89%", top: "41%", rot: -10, rx: -10, ry: 23, scale: 1.02 },
+    { left: "82%", top: "79%", rot: 30, rx: 20, ry: -40, scale: 0.82 },
   ];
 
   const cards = [
@@ -173,7 +146,6 @@ function applyCoverPhotoTilt() {
     card.style.transformStyle = "preserve-3d";
     card.style.willChange = "transform";
     card.style.pointerEvents = "auto";
-    // 기존 floatPolaroid 애니메이션의 transform 덮어쓰기 방지
     card.style.filter = "drop-shadow(0 18px 32px rgba(52,76,173,0.14))";
     card.style.transform = `translate(-50%, -50%) rotate(${p.rot}deg) rotateX(${p.rx}deg) rotateY(${p.ry}deg) scale(${p.scale})`;
   });
@@ -429,7 +401,6 @@ function schedulePaint() {
     drawAlbums();
     drawCoverPolaroids();
     refreshBatch();
-    drawMemoryPill();
   });
 }
 function subscribe(path, map) {
@@ -570,16 +541,26 @@ function createAlbumPhoto(row) {
   btn.className = "album-photo";
   btn.dataset.date = clockTime(row.t);
   btn.title = row.data.labelTxt || row.day;
+
+  // 사진마다 일정하지만 서로 다른 기울기
+  const angles = [-3, 2, -1.8, 3.4, 1.2, -2.5, 2.8, -1];
+  const hash = [...String(row.key)].reduce(
+    (sum, ch) => sum + ch.charCodeAt(0),
+    0,
+  );
+  btn.style.setProperty("--photo-angle", `${angles[hash % angles.length]}deg`);
+
   const img = new Image();
   img.src = row.data.image;
   img.alt = row.data.labelTxt || "저장된 사진";
   img.loading = "lazy";
   img.draggable = false;
   img.onload = () => {
-    const r = img.naturalWidth / img.naturalHeight;
-    btn.classList.toggle("landscape", r > 1.3);
-    btn.classList.toggle("portrait", r < 0.75);
+    const ratio = img.naturalWidth / img.naturalHeight;
+    btn.classList.toggle("landscape", ratio > 1.3);
+    btn.classList.toggle("portrait", ratio < 0.75);
   };
+
   btn.append(img);
   installPhotoInteraction(btn, "locker", row.key);
   return btn;
@@ -608,73 +589,87 @@ function createPage(day, rows) {
 }
 function drawAlbums() {
   const rail = $("album-rail");
-  const keepScroll = rail.scrollLeft;
+  const previousScroll = rail.scrollLeft;
   rail.replaceChildren();
+
   const rows = filteredSaved();
   if (!rows.length) {
-    const e = document.createElement("div");
-    e.className = "archive-empty";
-    e.innerHTML =
-      "<strong>아직 펼칠 앨범이 없어요.</strong><span>인화실에서 사진과 메모를 저장해 보세요.</span>";
-    rail.appendChild(e);
+    const empty = document.createElement("div");
+    empty.className = "archive-empty";
+    empty.textContent =
+      "아직 펼칠 앨범이 없어요. 인화실에서 사진을 저장해 보세요.";
+    rail.append(empty);
     return;
   }
+
   const days = new Map();
-  rows.forEach((r) => {
-    if (!days.has(r.day)) days.set(r.day, []);
-    days.get(r.day).push(r);
+  rows.forEach((row) => {
+    if (!days.has(row.day)) days.set(row.day, []);
+    days.get(row.day).push(row);
   });
-  const keys = [...days.keys()].sort().reverse();
-  for (let i = 0; i < keys.length; i += 2) {
-    const dayA = keys[i],
-      dayB = keys[i + 1];
-    const albumKey = `${dayA}|${dayB || ""}`;
+
+  const dates = [...days.keys()].sort().reverse();
+  const covers = [
+    { color: "#b9ccef", ink: "#20345d", dark: false },
+    { color: "#e2c8b0", ink: "#4d392c", dark: false },
+    { color: "#27343f", ink: "#f4f5f0", dark: true },
+    { color: "#b8cdbf", ink: "#284637", dark: false },
+    { color: "#e5b8bf", ink: "#5f3545", dark: false },
+    { color: "#c5badc", ink: "#473962", dark: false },
+  ];
+  const rotations = [-4.2, 3.3, -2.4, 4.5, -3.5, 2.1];
+
+  for (let i = 0; i < dates.length; i += 2) {
+    const albumIndex = Math.floor(i / 2);
+    const firstDay = dates[i];
+    const secondDay = dates[i + 1];
+    const albumKey = `${firstDay}|${secondDay || ""}`;
+    const style = covers[albumIndex % covers.length];
+
     const card = document.createElement("article");
     card.className = "album-card";
     card.dataset.album = albumKey;
+    card.dataset.dark = String(style.dark);
+    card.style.setProperty("--album-color", style.color);
+    card.style.setProperty("--album-ink", style.ink);
+    card.style.setProperty(
+      "--album-angle",
+      `${rotations[albumIndex % rotations.length]}deg`,
+    );
     if (albumClosed.has(albumKey)) card.classList.add("closed");
-    const caption = document.createElement("div");
-    caption.className = "album-caption";
-    caption.innerHTML = `<strong>ALBUM / ${pad(Math.floor(i / 2) + 1)}</strong><span>책을 누르면 열고 닫을 수 있어요</span>`;
+
     const spread = document.createElement("div");
     spread.className = "album-spread";
     spread.append(
-      createPage(dayA, days.get(dayA)),
-      createPage(dayB, days.get(dayB) || []),
+      createPage(firstDay, days.get(firstDay)),
+      createPage(secondDay, secondDay ? days.get(secondDay) : []),
     );
+
     const cover = document.createElement("div");
     cover.className = "album-cover";
-    const start = dayB || dayA;
-    const end = dayA;
-    cover.innerHTML = `<div class="micro">PERSONAL MEMORY COLLECTION<br>CAPTURE TO MEMO</div><h3>Days<br>worth<br>keeping.</h3><p>${escapeHTML(start)} — ${escapeHTML(end)}</p>`;
-    card.append(caption, spread, cover);
-    card.addEventListener("click", (e) => {
-      if (batchMode || e.target.closest("button,input")) return;
+    cover.innerHTML = `
+      <span class="album-cover-mini">CAPTURE TO MEMO · VOL.${String(albumIndex + 1).padStart(2, "0")}</span>
+      <div class="album-cover-name">Our<br>Days.</div>
+      <span class="album-cover-period">${escapeHTML(secondDay || firstDay)} — ${escapeHTML(firstDay)}</span>
+    `;
+
+    const caption = document.createElement("div");
+    caption.className = "album-caption";
+    const info = document.createElement("span");
+    info.textContent = `ALBUM ${String(albumIndex + 1).padStart(2, "0")}  /  ${secondDay || firstDay} — ${firstDay}`;
+    caption.append(info);
+
+    card.append(spread, cover, caption);
+    card.addEventListener("click", (event) => {
+      if (batchMode || event.target.closest("button,input")) return;
       if (albumClosed.has(albumKey)) albumClosed.delete(albumKey);
       else albumClosed.add(albumKey);
       card.classList.toggle("closed", albumClosed.has(albumKey));
     });
     rail.append(card);
   }
-  rail.scrollLeft = keepScroll;
-}
-function drawMemoryPill() {
-  const today = Date.now() - 5 * 86400000;
-  const old = [...saved].filter(([, v]) => v?.image && memoTime(v) <= today);
-  $("memory-pill").textContent = old.length
-    ? `✦ 오늘의 메모 · 오래된 기록 ${old.length}개`
-    : "✦ 오늘의 메모 · 추억을 모아주세요";
-}
-function openRandomMemory() {
-  const old = [...saved].filter(
-    ([, v]) => v?.image && memoTime(v) <= Date.now() - 5 * 86400000,
-  );
-  if (!old.length) {
-    toast("5일 이상 지난 메모가 아직 없어요.");
-    return;
-  }
-  const [key] = old[Math.floor(Math.random() * old.length)];
-  openEditor("locker", key);
+
+  rail.scrollLeft = previousScroll;
 }
 
 // -------------------------------------------------------------------
@@ -1546,8 +1541,6 @@ function setupViewportResize() {
 }
 function init() {
   // 예전 좌우 이동 버튼을 제거했더라도 오류가 나지 않게 함
-  if ($("next-room")) $("next-room").onclick = () => goRoom("darkroom");
-  if ($("prev-room")) $("prev-room").onclick = () => goRoom("cover");
   $("archive-tab").onclick = () => setArchive(true);
   $("archive-close").onclick = () => setArchive(false);
   $("archive-grip").onclick = () => setArchive(false);
@@ -1568,7 +1561,6 @@ function init() {
     $("archive-date").value = "";
     drawAlbums();
   };
-  $("memory-pill").onclick = openRandomMemory;
   $("viewer-close").onclick = closePhotoViewer;
   $("batch-all").onclick = toggleAll;
   $("batch-cancel").onclick = leaveBatch;
@@ -1579,12 +1571,18 @@ function init() {
   });
   setupSwipes();
   setupViewportResize();
-  subscribe("incoming", incoming);
-  subscribe("saved_memos", saved);
+  if (!db || typeof db.ref !== "function") {
+    toast(
+      "Firebase 연결을 확인해 주세요. 인터넷 또는 Firebase 설정을 확인하세요.",
+    );
+    console.error("Firebase Realtime Database가 초기화되지 않았습니다.");
+  } else {
+    subscribe("incoming", incoming);
+    subscribe("saved_memos", saved);
+  }
   drawDarkroom();
   drawAlbums();
   drawCoverPolaroids();
-  drawMemoryPill();
 }
 if (document.readyState === "loading")
   document.addEventListener("DOMContentLoaded", init, { once: true });
