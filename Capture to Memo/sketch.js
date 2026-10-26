@@ -1926,36 +1926,64 @@ function makeField(label, initial = "") {
    EDITOR INK — 펜 버튼 + 사진/글 위 드로잉 + 저장
    sketch.js에서 function openEditor(...) 바로 위에 붙여넣기
    ===================================================== */
+
+/* ================================================================
+   EDITOR INK v3 — memo 글 위에서 선 끊김 방지 / 버튼 클릭 우선
+   sketch.js: 기존 setupEditorInk(...) 함수 전체와 교체
+   ================================================================ */
+/* =====================================================================
+   CTM EDITOR INK v5 — 펜 + 획 전체 지우개 / 태블릿 지원
+   sketch.js에서 기존 setupEditorInk({ layer, box, polaroid, data }) 함수
+   처음부터 끝까지 아래 함수 하나로 교체하세요.
+   ===================================================================== */
 function setupEditorInk({ layer, box, polaroid, data }) {
-  const ns = "http://www.w3.org/2000/svg";
-  const ink = document.createElementNS(ns, "svg");
+  const NS = "http://www.w3.org/2000/svg";
+  const ink = document.createElementNS(NS, "svg");
   ink.classList.add("editor-ink-art");
   ink.setAttribute("viewBox", "0 0 1000 1000");
   ink.setAttribute("preserveAspectRatio", "none");
   ink.setAttribute("aria-hidden", "true");
+  ink.style.touchAction = "none";
+  ink.style.pointerEvents = "none";
   box.appendChild(ink);
 
+  // 기존 pen.svg 재사용
   const pen = document.createElement("button");
   pen.type = "button";
   pen.className = "editor-pen-toggle";
-  pen.title = "그리기 켜기";
-  pen.setAttribute("aria-label", "그리기 켜기");
+  pen.setAttribute("aria-label", "펜 켜기");
   pen.setAttribute("aria-pressed", "false");
+  pen.title = "펜 켜기";
   const penImage = new Image();
   penImage.src = "./pen.svg";
   penImage.alt = "";
   penImage.draggable = false;
-  pen.appendChild(penImage);
-  box.appendChild(pen);
+  pen.append(penImage);
+  box.append(pen);
 
-  // 모든 좌표는 팝업 크기 기준 0~1로 저장한다.
-  // 크기가 바뀌어도 선을 다시 표시할 수 있다.
-  const strokes = Array.isArray(data.memoInk)
+  // 새 eraser.svg (기존 펜과 같은 폴더)
+  const eraser = document.createElement("button");
+  eraser.type = "button";
+  eraser.className = "editor-eraser-toggle";
+  eraser.setAttribute("aria-label", "지우개 켜기");
+  eraser.setAttribute("aria-pressed", "false");
+  eraser.title = "지우개 켜기";
+  const eraserImage = new Image();
+  eraserImage.src = "./eraser.svg";
+  eraserImage.alt = "";
+  eraserImage.draggable = false;
+  eraser.append(eraserImage);
+  box.append(eraser);
+
+  // Firebase memoInk: 기존 선 데이터 형식 [ [ [x,y], ... ], ... ] 유지
+  // x,y는 팝업 내부 0~1 상대 좌표이며, 밖으로 나온 사진에서는 범위를 벗어날 수 있음.
+  let strokes = Array.isArray(data.memoInk)
     ? data.memoInk
-        .filter((s) => Array.isArray(s) && s.length > 0)
-        .slice(0, 400)
-        .map((s) =>
-          s
+        .slice(0, 900)
+        .filter(Array.isArray)
+        .map((points) =>
+          points
+            .slice(0, 1800)
             .filter(
               (p) =>
                 Array.isArray(p) &&
@@ -1963,19 +1991,25 @@ function setupEditorInk({ layer, box, polaroid, data }) {
                 Number.isFinite(Number(p[0])) &&
                 Number.isFinite(Number(p[1])),
             )
-            .slice(0, 1500)
             .map((p) => [Number(p[0]), Number(p[1])]),
         )
-        .filter((s) => s.length)
+        .filter((points) => points.length > 0)
     : [];
 
-  let active = false;
+  let mode = "none"; // none / pen / eraser
   let pointerId = null;
   let currentStroke = null;
+  let currentPath = null;
+  let previousPoint = null;
   let disposed = false;
+  const ERASER_RADIUS_PX = 22; // 닿은 획 전체를 삭제하는 지우개 반경
 
-  function makePoint(clientX, clientY) {
-    const r = box.getBoundingClientRect();
+  function rect() {
+    return box.getBoundingClientRect();
+  }
+
+  function point(clientX, clientY) {
+    const r = rect();
     return [
       Math.round(((clientX - r.left) / Math.max(1, r.width)) * 10000) / 10000,
       Math.round(((clientY - r.top) / Math.max(1, r.height)) * 10000) / 10000,
@@ -1983,95 +2017,301 @@ function setupEditorInk({ layer, box, polaroid, data }) {
   }
 
   function isInside(x, y) {
-    const rects = [
-      box.getBoundingClientRect(),
-      polaroid.getBoundingClientRect(),
-    ];
-    return rects.some(
-      (r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom,
+    return [box, polaroid].some((el) => {
+      const r = el.getBoundingClientRect();
+      return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    });
+  }
+
+  function validPosition(e) {
+    return (
+      Number.isFinite(e.clientX) &&
+      Number.isFinite(e.clientY) &&
+      !(e.clientX === 0 && e.clientY === 0) &&
+      isInside(e.clientX, e.clientY)
     );
   }
 
-  function updateInk() {
+  // 모든 중요한 버튼은 펜/지우개보다 우선 처리
+  function isControl(target) {
+    return (
+      target instanceof Element &&
+      !!target.closest(
+        ".editor-pen-toggle, .editor-eraser-toggle, " +
+          ".editor-close, .editor-actions button, .editor-btn",
+      )
+    );
+  }
+
+  function redrawPath(path, points) {
+    if (!path || !points.length) return;
+    const d = points.map(
+      (p, i) =>
+        `${i ? "L" : "M"}${(p[0] * 1000).toFixed(2)} ${(p[1] * 1000).toFixed(2)}`,
+    );
+    if (points.length === 1) d.push("l 0.05 0.05");
+    path.setAttribute("d", d.join(" "));
+  }
+
+  function createPath(points) {
+    const path = document.createElementNS(NS, "path");
+    ink.append(path);
+    redrawPath(path, points);
+    return path;
+  }
+
+  function redrawAll() {
     ink.replaceChildren();
-    for (const points of strokes) {
-      if (!points.length) continue;
-      const path = document.createElementNS(ns, "path");
-      const commands = points.map(
-        (p, i) =>
-          `${i ? "L" : "M"}${(p[0] * 1000).toFixed(2)} ${(p[1] * 1000).toFixed(2)}`,
-      );
-      if (points.length === 1) {
-        commands.push(`l 0.05 0.05`);
+    strokes.forEach(createPath);
+  }
+  redrawAll();
+
+  function endGesture() {
+    if (pointerId !== null) {
+      try {
+        if (ink.hasPointerCapture(pointerId))
+          ink.releasePointerCapture(pointerId);
+      } catch (_) {
+        /* capture가 다른 요소에 걸려있어도 무시 */
       }
-      path.setAttribute("d", commands.join(" "));
-      ink.appendChild(path);
+    }
+    pointerId = null;
+    currentStroke = null;
+    currentPath = null;
+    previousPoint = null;
+  }
+
+  function setMode(next) {
+    if (disposed) return;
+    mode = mode === next ? "none" : next;
+    endGesture();
+    pen.classList.toggle("is-active", mode === "pen");
+    eraser.classList.toggle("is-active", mode === "eraser");
+    box.classList.toggle("editor-inking", mode !== "none");
+    box.classList.toggle("editor-erasing", mode === "eraser");
+    pen.setAttribute("aria-pressed", String(mode === "pen"));
+    eraser.setAttribute("aria-pressed", String(mode === "eraser"));
+    pen.setAttribute("aria-label", mode === "pen" ? "펜 끄기" : "펜 켜기");
+    eraser.setAttribute(
+      "aria-label",
+      mode === "eraser" ? "지우개 끄기" : "지우개 켜기",
+    );
+    pen.title = mode === "pen" ? "펜 끄기" : "펜 켜기";
+    eraser.title = mode === "eraser" ? "지우개 끄기" : "지우개 켜기";
+
+    // 메모 키보드가 열려 있으면 도구 전환 시 자연스럽게 닫기
+    if (mode !== "none" && box.contains(document.activeElement)) {
+      document.activeElement.blur?.();
+    }
+  }
+  pen.addEventListener("click", () => setMode("pen"));
+  eraser.addEventListener("click", () => setMode("eraser"));
+
+  // 점 P와 선분 AB 사이의 픽셀 거리 제곱
+  function distanceSquaredToSegment(px, py, ax, ay, bx, by) {
+    const dx = bx - ax,
+      dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    const t =
+      len2 < 0.000001
+        ? 0
+        : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+    const x = ax + t * dx - px,
+      y = ay + t * dy - py;
+    return x * x + y * y;
+  }
+
+  // 저사양 지우개: 지우개가 획의 어느 한 부분에 닿으면 획 전체 삭제.
+  // 선분 대 선분 충돌만 검사하고, 삭제가 발생할 때만 SVG를 다시 그림.
+  function eraseBetween(from, to) {
+    const r = rect();
+    const w = Math.max(1, r.width),
+      h = Math.max(1, r.height);
+    const ax = from[0] * w,
+      ay = from[1] * h;
+    const bx = to[0] * w,
+      by = to[1] * h;
+    const radius2 = ERASER_RADIUS_PX * ERASER_RADIUS_PX;
+    const left = Math.min(ax, bx) - ERASER_RADIUS_PX;
+    const right = Math.max(ax, bx) + ERASER_RADIUS_PX;
+    const top = Math.min(ay, by) - ERASER_RADIUS_PX;
+    const bottom = Math.max(ay, by) + ERASER_RADIUS_PX;
+
+    function intersects(x0, y0, x1, y1) {
+      // 지우개 이동 선분과 획 선분이 교차하는 경우
+      const cross = (ux, uy, vx, vy) => ux * vy - uy * vx;
+      const d1 = cross(bx - ax, by - ay, x0 - ax, y0 - ay);
+      const d2 = cross(bx - ax, by - ay, x1 - ax, y1 - ay);
+      const d3 = cross(x1 - x0, y1 - y0, ax - x0, ay - y0);
+      const d4 = cross(x1 - x0, y1 - y0, bx - x0, by - y0);
+      if (
+        ((d1 <= 0 && d2 >= 0) || (d1 >= 0 && d2 <= 0)) &&
+        ((d3 <= 0 && d4 >= 0) || (d3 >= 0 && d4 <= 0))
+      )
+        return true;
+      // 교차하지 않아도 지우개 반경 이내면 삭제
+      return (
+        distanceSquaredToSegment(x0, y0, ax, ay, bx, by) <= radius2 ||
+        distanceSquaredToSegment(x1, y1, ax, ay, bx, by) <= radius2 ||
+        distanceSquaredToSegment(ax, ay, x0, y0, x1, y1) <= radius2 ||
+        distanceSquaredToSegment(bx, by, x0, y0, x1, y1) <= radius2
+      );
+    }
+
+    let changed = false;
+    const remaining = [];
+    for (const line of strokes) {
+      if (!line.length) continue;
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
+      for (const p of line) {
+        const x = p[0] * w,
+          y = p[1] * h;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+      if (maxX < left || minX > right || maxY < top || minY > bottom) {
+        remaining.push(line);
+        continue;
+      }
+      let hit = false;
+      if (line.length === 1) {
+        hit =
+          distanceSquaredToSegment(
+            line[0][0] * w,
+            line[0][1] * h,
+            ax,
+            ay,
+            bx,
+            by,
+          ) <= radius2;
+      } else {
+        for (let i = 1; i < line.length; i++) {
+          if (
+            intersects(
+              line[i - 1][0] * w,
+              line[i - 1][1] * h,
+              line[i][0] * w,
+              line[i][1] * h,
+            )
+          ) {
+            hit = true;
+            break;
+          }
+        }
+      }
+      if (hit) changed = true;
+      else remaining.push(line);
+    }
+    if (changed) {
+      strokes = remaining;
+      redrawAll();
     }
   }
 
-  function finishStroke() {
-    pointerId = null;
-    currentStroke = null;
-  }
-
-  function toggle() {
-    active = !active;
-    if (!active) finishStroke();
-    pen.classList.toggle("is-active", active);
-    box.classList.toggle("editor-inking", active);
-    pen.setAttribute("aria-pressed", String(active));
-    pen.setAttribute("aria-label", active ? "그리기 끄기" : "그리기 켜기");
-    pen.title = active ? "그리기 끄기" : "그리기 켜기";
-  }
-  pen.addEventListener("click", toggle);
-
-  // 기존 폴라로이드 클릭/날짜 선택/메모 입력 이벤트보다 먼저 처리.
-  // 펜을 끄면 이벤트를 가로채지 않아 기존 편집 기능이 돌아온다.
   function down(e) {
-    if (!active || disposed || pen.contains(e.target)) return;
+    if (mode === "none" || disposed || isControl(e.target)) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    if (!isInside(e.clientX, e.clientY)) return;
+    if (e.isPrimary === false || pointerId !== null || !validPosition(e))
+      return;
+
+    // 텍스트 선택/글쓰기보다 펜 또는 지우개를 우선
     e.preventDefault();
     e.stopImmediatePropagation();
-    if (pointerId !== null) return;
     pointerId = e.pointerId;
-    currentStroke = [makePoint(e.clientX, e.clientY)];
-    strokes.push(currentStroke);
-    updateInk();
+    previousPoint = point(e.clientX, e.clientY);
+
+    if (mode === "pen") {
+      currentStroke = [previousPoint];
+      strokes.push(currentStroke);
+      currentPath = createPath(currentStroke);
+    } else {
+      eraseBetween(previousPoint, previousPoint);
+    }
+    // pointer가 글, 사진 위를 지나도 같은 제스처 유지
+    try {
+      ink.setPointerCapture(pointerId);
+    } catch (_) {}
   }
 
   function move(e) {
-    if (!active || disposed || pointerId !== e.pointerId || !currentStroke)
+    if (
+      mode === "none" ||
+      disposed ||
+      e.pointerId !== pointerId ||
+      !previousPoint
+    )
       return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    const next = makePoint(e.clientX, e.clientY);
-    const previous = currentStroke[currentStroke.length - 1];
-    const r = box.getBoundingClientRect();
-    const pixels = Math.hypot(
-      (next[0] - previous[0]) * r.width,
-      (next[1] - previous[1]) * r.height,
-    );
-    if (pixels >= 1.8 && currentStroke.length < 1500) {
-      currentStroke.push(next);
-      updateInk();
+
+    if (!validPosition(e)) {
+      endGesture();
+      return;
     }
+    const next = point(e.clientX, e.clientY);
+    const r = rect();
+    const dist = Math.hypot(
+      (next[0] - previousPoint[0]) * r.width,
+      (next[1] - previousPoint[1]) * r.height,
+    );
+    const maxJump = Math.max(130, Math.min(250, r.width * 0.32));
+    // (0,0) 등 튀는 터치 좌표로 긴 선이 생기는 것 방지
+    if (dist > maxJump) {
+      endGesture();
+      return;
+    }
+
+    if (mode === "pen") {
+      if (dist >= 1.8 && currentStroke && currentStroke.length < 1800) {
+        currentStroke.push(next);
+        redrawPath(currentPath, currentStroke);
+      }
+    } else if (mode === "eraser") {
+      eraseBetween(previousPoint, next);
+    }
+    previousPoint = next;
   }
 
   function up(e) {
-    if (pointerId !== e.pointerId) return;
+    if (e.pointerId !== pointerId) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    if (currentStroke && currentStroke.length < 1500) {
-      currentStroke.push(makePoint(e.clientX, e.clientY));
-      updateInk();
+    if (validPosition(e) && previousPoint) {
+      const next = point(e.clientX, e.clientY);
+      const r = rect();
+      const dist = Math.hypot(
+        (next[0] - previousPoint[0]) * r.width,
+        (next[1] - previousPoint[1]) * r.height,
+      );
+      if (dist <= Math.max(130, Math.min(250, r.width * 0.32))) {
+        if (mode === "eraser") eraseBetween(previousPoint, next);
+        else if (
+          mode === "pen" &&
+          currentStroke &&
+          dist >= 1.8 &&
+          currentStroke.length < 1800
+        ) {
+          currentStroke.push(next);
+          redrawPath(currentPath, currentStroke);
+        }
+      }
     }
-    finishStroke();
+    endGesture();
+  }
+
+  function cancel(e) {
+    if (e.pointerId === pointerId) endGesture();
   }
 
   function interceptClick(e) {
-    // 펜 활성화 중에는 펜 이외의 누름을 편집/저장으로 처리하지 않음.
-    if (active && !pen.contains(e.target) && isInside(e.clientX, e.clientY)) {
+    // 펜/지우개 ON 중에도 저장·취소·X 및 도구 버튼은 클릭 가능
+    if (mode === "none" || disposed || isControl(e.target)) return;
+    if (validPosition(e)) {
       e.preventDefault();
       e.stopImmediatePropagation();
     }
@@ -2080,28 +2320,30 @@ function setupEditorInk({ layer, box, polaroid, data }) {
   document.addEventListener("pointerdown", down, true);
   document.addEventListener("pointermove", move, true);
   document.addEventListener("pointerup", up, true);
-  document.addEventListener("pointercancel", up, true);
+  document.addEventListener("pointercancel", cancel, true);
   document.addEventListener("click", interceptClick, true);
-
-  updateInk();
 
   return {
     serialize() {
-      // Firebase Realtime Database가 지원하는 배열/숫자로 저장.
       return strokes.map((s) => s.map((p) => [...p]));
     },
     dispose() {
       if (disposed) return;
       disposed = true;
-      finishStroke();
+      endGesture();
       document.removeEventListener("pointerdown", down, true);
       document.removeEventListener("pointermove", move, true);
       document.removeEventListener("pointerup", up, true);
-      document.removeEventListener("pointercancel", up, true);
+      document.removeEventListener("pointercancel", cancel, true);
       document.removeEventListener("click", interceptClick, true);
+      pen.remove();
+      eraser.remove();
+      ink.remove();
+      box.classList.remove("editor-inking", "editor-erasing");
     },
   };
 }
+
 function openEditor(source, key) {
   if (batchMode || busy) return;
 
@@ -2137,8 +2379,7 @@ function openEditor(source, key) {
   const stage = document.createElement("div");
   stage.className = "editor-image-stage";
 
-  const polaroid = document.createElement("button");
-  polaroid.type = "button";
+  const polaroid = document.createElement("div");
   polaroid.className = "editor-polaroid";
   polaroid.setAttribute("aria-label", "사진 크게 보기");
 
@@ -2279,7 +2520,7 @@ function openEditor(source, key) {
     box.scrollIntoView({ block: "center", behavior: "smooth" });
   });
 
-  polaroid.addEventListener("click", () => openPhotoViewer(data.image));
+  media.addEventListener("click", () => openPhotoViewer(data.image));
 
   function closeEditorWithoutSaving() {
     if (busy) return;
