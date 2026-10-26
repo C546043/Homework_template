@@ -327,8 +327,8 @@
         }
       }
       /* ------------------------------------------------------------
-   THE PRINT ROOM — TWO CROSSING WIRES + PHYSICS POLAROIDS
-   앞줄: Firebase 실제 사진 | 뒷줄: 흐린 빈 폴라로이드
+   //THE PRINT ROOM — TWO CROSSING WIRES + PHYSICS POLAROIDS
+   //앞줄: Firebase 실제 사진 | 뒷줄: 흐린 빈 폴라로이드
    ------------------------------------------------------------ */
       #world-wire-overlay {
         position: absolute;
@@ -355,13 +355,6 @@
       .world-page {
         z-index: 2;
       }
-      #cover {
-        z-index: 4;
-      }
-      #darkroom {
-        z-index: 2;
-      }
-
       #darkroom {
         display: block;
         overflow: visible;
@@ -1266,44 +1259,347 @@
         cursor: pointer;
         z-index: 3;
       }
-      .viewer {
-        z-index: 100;
-        background: rgba(10, 13, 22, 0.96);
-        display: flex;
+      /* =========================================================
+   GLASS EDITOR — IMAGE FIRST UI (REFINED)
+   ========================================================= */
+      .editor-overlay {
         align-items: center;
         justify-content: center;
-        padding: 50px 22px 25px;
+        padding: 20px;
+        background: rgba(14, 20, 34, 0.26);
+        backdrop-filter: blur(16px) saturate(1.04);
+        -webkit-backdrop-filter: blur(16px) saturate(1.04);
+        overflow: auto;
+        overscroll-behavior: contain;
       }
-      .viewer img {
+
+      .editor-modal {
+        position: relative;
+        width: min(980px, 92vw);
+        aspect-ratio: 15 / 8; /* 기존보다 세로를 줄임 */
+        height: auto;
+        min-height: 0;
+        padding: 0;
+        overflow: visible; /* 폴라로이드가 밖으로 튀어나오게 */
+        border-radius: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        background: linear-gradient(
+          145deg,
+          rgba(255, 255, 255, 0.14),
+          rgba(255, 255, 255, 0.06) 42%,
+          rgba(214, 224, 246, 0.08) 100%
+        );
+        box-shadow:
+          0 24px 80px rgba(18, 31, 62, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.32),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(26px) saturate(1.08);
+        -webkit-backdrop-filter: blur(26px) saturate(1.08);
+        touch-action: none;
+      }
+
+      .editor-modal::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(
+            circle at 18% 16%,
+            rgba(255, 255, 255, 0.24),
+            transparent 24%
+          ),
+          radial-gradient(
+            circle at 84% 12%,
+            rgba(255, 255, 255, 0.1),
+            transparent 22%
+          );
+      }
+
+      .editor-close {
+        position: absolute;
+        top: 18px;
+        right: 20px;
+        z-index: 6;
+        width: 46px;
+        height: 46px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        color: #33456c;
+        font-size: 24px;
+        font-weight: 700;
+        cursor: pointer;
+        backdrop-filter: blur(10px);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      }
+
+      .editor-shell {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: 0.92fr 1.08fr;
+        gap: 34px; /* 사진과 글 영역 간격 더 넓힘 */
         width: 100%;
         height: 100%;
-        object-fit: contain;
-        user-select: none;
+        padding: 24px 28px 20px;
       }
-      #viewer-close {
+
+      .editor-left {
+        min-width: 0;
+        min-height: 0;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        overflow: visible;
+      }
+
+      .editor-image-stage {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+        overflow: visible; /* 폴라로이드 잘리지 않게 */
+      }
+      .editor-polaroid {
         position: absolute;
-        right: 24px;
-        top: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.34);
-        background: rgba(255, 255, 255, 0.12);
-        color: white;
-        padding: 12px;
-        border-radius: 10px;
+        left: -6px; /* 창 왼쪽 바깥으로 조금 튀어나오게 */
+        top: 52%;
+        width: min(96%, 520px);
+        aspect-ratio: 168 / 208;
+        transform: translateY(-54%) rotate(-7deg);
+        padding: 14px 14px 58px;
+        border-radius: 4px; /* 거의 직각 */
+        border: 1px solid rgba(255, 255, 255, 0.82);
+        background: linear-gradient(
+          145deg,
+          rgba(255, 255, 255, 0.88),
+          rgba(241, 246, 255, 0.56)
+        );
+        box-shadow:
+          0 18px 42px rgba(25, 42, 78, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.95);
+        cursor: zoom-in;
+        z-index: 3;
       }
-      #toast {
-        position: fixed;
-        z-index: 150;
-        bottom: 95px;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 13px 20px;
-        border-radius: 100px;
-        background: #203052;
-        color: white;
-        box-shadow: 0 9px 26px rgba(0, 0, 0, 0.2);
-        font-size: 13px;
-        max-width: 90vw;
-        text-align: center;
+
+      .editor-polaroid-media {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        overflow: visible;
+        background: transparent;
+      }
+
+      .editor-polaroid-media img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain !important; /* 원본비율 최대한 유지 */
+        object-position: center;
+        pointer-events: none;
+        filter: drop-shadow(0 10px 16px rgba(18, 28, 56, 0.1));
+      }
+
+      .editor-polaroid-date {
+        margin-top: 18px;
+        width: 100%;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: rgba(56, 71, 104, 0.62);
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+      }
+
+      .editor-polaroid-title {
+        width: 100%;
+        margin-top: 4px;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: rgba(46, 58, 84, 0.88);
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+      }
+
+      .editor-right {
+        min-width: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding-top: 10px;
+        padding-left: 34px; /* 글 영역을 사진에서 더 멀리 */
+        position: relative;
+        z-index: 2;
+      }
+
+      .editor-topbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 8px;
+        padding-right: 62px;
+      }
+
+      .editor-heading-wrap {
+        min-width: 0;
+      }
+
+      .editor-kicker {
+        margin: 0 0 4px;
+        color: rgba(255, 255, 255, 0.52);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+      }
+
+      .editor-heading {
+        margin: 0;
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .editor-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+      }
+
+      .editor-btn {
+        min-height: 42px;
+        padding: 0 18px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        background: rgba(255, 255, 255, 0.1);
+        color: #33456c;
+        font-size: 15px;
+        font-weight: 800;
+        cursor: pointer;
+        backdrop-filter: blur(10px);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      }
+
+      .editor-btn.primary {
+        background: rgba(94, 110, 244, 0.88);
+        border-color: rgba(94, 110, 244, 0.88);
+        color: #fff;
+        box-shadow: 0 10px 26px rgba(87, 102, 232, 0.24);
+      }
+
+      .editor-writing-panel {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+        overflow: visible;
+        backdrop-filter: none;
+      }
+
+      .editor-writing-panel::before {
+        content: none;
+      }
+
+      .editor-note-surface {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        height: 100%;
+        min-height: 250px;
+        padding: 18px 2px 8px 0;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: rgba(255, 255, 255, 0.92); /* 글씨 흰색 계열 */
+        font-size: 16px;
+        line-height: 2.05;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        touch-action: manipulation;
+        user-select: text;
+        -webkit-user-select: text;
+        box-shadow: none;
+      }
+
+      .editor-note-surface:empty::before {
+        content: attr(data-placeholder);
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .editor-note-surface * {
+        color: inherit;
+      }
+
+      @media (max-width: 980px) {
+        .editor-modal {
+          width: min(94vw, 94vw);
+          aspect-ratio: auto;
+          max-height: 82dvh;
+        }
+
+        .editor-shell {
+          grid-template-columns: 1fr;
+          gap: 12px;
+          padding: 18px 18px 16px;
+          overflow-y: auto;
+        }
+
+        .editor-left {
+          min-height: 340px;
+          overflow: visible;
+        }
+
+        .editor-image-stage {
+          min-height: 320px;
+        }
+
+        .editor-polaroid {
+          width: min(78vw, 430px);
+          left: 6px;
+          top: 50%;
+          transform: translateY(-52%) rotate(-6deg);
+        }
+
+        .editor-topbar {
+          padding-right: 56px;
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .editor-actions {
+          width: 100%;
+          justify-content: flex-end;
+        }
+
+        .editor-note-surface {
+          min-height: 240px;
+          padding-right: 2px;
+          font-size: 15px;
+          line-height: 1.95;
+        }
+
+        .editor-heading {
+          font-size: 14px;
+        }
+
+        .editor-polaroid-title {
+          font-size: 24px;
+        }
       }
       /* ------------------------------------------------------------
    04. BULK SELECTION
@@ -1505,167 +1801,164 @@
         }
       }
 
-      /* ==================================
-   인화실 하단 3D 메모 책
-================================== */
-
-      #memo-drop-zone {
-        position: fixed;
-        left: 50%;
-        bottom: 8px;
-        transform: translateX(-50%);
-
-        width: min(430px, 56vw);
-        height: 145px;
-
-        border: none;
-        border-radius: 0;
-        background: transparent;
-        box-shadow: none;
-        padding: 0;
-        overflow: visible;
-
-        pointer-events: none;
-        z-index: 6;
-      }
-
-      #memo-book-3d {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-
-        pointer-events: none;
-        overflow: visible;
-
-        filter: drop-shadow(0 10px 18px rgba(71, 95, 166, 0.18));
-        transition: filter 0.16s ease;
-      }
-
-      #memo-book-3d canvas {
-        display: block;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-      }
-
-      #memo-drop-zone.is-over #memo-book-3d {
-        filter: drop-shadow(0 12px 24px rgba(73, 101, 208, 0.26));
-      }
-
-      .memo-drop-hint {
-        position: absolute;
-        left: 50%;
-        bottom: -10px;
-        transform: translateX(-50%);
-
-        text-align: center;
-        color: #7d8eb1;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        white-space: nowrap;
-
-        pointer-events: none;
-      }
-
-      /* 인화실 하단 책: 크기 및 위치 최종 조정 */
-      #memo-drop-zone {
-        position: fixed;
-        left: 50%;
-        bottom: 20px;
-        transform: translateX(-50%);
-
-        width: min(800px, 92vw);
-        height: clamp(240px, 37vh, 350px);
-
-        padding: 0;
-        border: none;
-        background: transparent;
-        box-shadow: none;
-        overflow: visible;
-        pointer-events: none;
-        z-index: 6;
-      }
-
-      #memo-book-3d {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        overflow: visible;
-        pointer-events: none;
-      }
-
-      #memo-book-3d canvas {
-        display: block;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-      }
-
-      #memo-drop-zone.is-over {
-        border: none;
-        background: transparent;
-      }
-
-      /* 책을 화면이 아니라 인화실에 고정 */
-      #darkroom {
-        position: relative;
-        z-index: 4;
-        overflow: visible;
-      }
-
-      #memo-drop-zone {
-        position: absolute !important;
-        left: 50% !important;
-        right: auto !important;
-        bottom: -45px !important;
-        transform: translateX(-50%) !important;
-        z-index: 2 !important;
-      }
-
-      /* 드래그한 사진은 책 위에 표시 */
-      #darkroom-scene {
-        position: absolute;
-        z-index: 4;
-        overflow: visible !important;
-      }
-
-      #front-photo-layer {
-        overflow: visible !important;
-      }
-
-      /* 기존 두 화면 200vw + 가위 구역 24vw */
+      /* === Integrated 2026-10-26: book behind entrance, photobook, scissors, desk === */
       #world-track {
-        width: 224vw !important;
-      }
-
-      /* 줄은 가위 구역 안까지 이어지지 않음 */
-      #world-wire-overlay {
         width: 200vw !important;
       }
-
-      /* 인화실 오른쪽 파기 공간 */
-      #shred-zone {
+      #world-wire-overlay {
+        width: 100%;
+        z-index: 1;
+      }
+      #world-wire-overlay path {
+        vector-effect: non-scaling-stroke;
+        stroke: rgba(84, 113, 177, 0.48);
+        stroke-linecap: round;
+        stroke-width: 1.6;
+        fill: none;
+      }
+      #cover {
+        z-index: 6;
+        overflow: visible;
+      }
+      #darkroom {
         position: relative;
-        flex: 0 0 24vw;
-        width: 24vw;
+        z-index: 3;
+        overflow: visible;
+      }
+      #darkroom-scene {
+        z-index: 9;
+        overflow: visible;
+        pointer-events: none;
+      }
+      #front-photo-layer {
+        z-index: 3;
+        overflow: visible;
+        pointer-events: none;
+      }
+      #front-photo-layer .hanging-polaroid {
+        pointer-events: auto;
+        touch-action: none;
+      }
+      .cover-float-card img,
+      .hanging-polaroid img,
+      .album-photo img {
+        object-fit: cover !important;
+        object-position: center center !important;
+        background: transparent !important;
+      }
+      .edit-image,
+      .viewer img {
+        object-fit: contain !important;
+        object-position: center center !important;
+      }
+      .hanging-polaroid.detached,
+      .hanging-polaroid.dragging {
+        cursor: grabbing;
+      }
+      .ctm-detach-ring {
+        position: absolute;
+        left: 50%;
+        top: -12px;
+        width: 22px;
+        height: 22px;
+        border: 2px solid rgba(105, 158, 248, 0.84);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 51;
+        box-shadow: 0 0 13px rgba(104, 153, 246, 0.42);
+      }
+      .ctm-detach-spark {
+        position: absolute;
+        left: 50%;
+        top: -12px;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #b6f1ff;
+        pointer-events: none;
+        z-index: 52;
+      }
+      #memo-drop-zone {
+        position: absolute;
+        left: 50%;
+        bottom: -38px;
+        width: min(800px, 90vw);
+        height: clamp(250px, 36vh, 355px);
+        transform: translateX(-50%);
+        z-index: 5;
+        pointer-events: none;
+        background: transparent;
+        border: 0;
+        overflow: visible;
+      }
+      #memo-book-desk {
+        position: absolute;
+        z-index: 0;
+        left: 50%;
+        bottom: 50px;
+        width: 96%;
+        height: 118px;
+        transform: translateX(-50%) perspective(600px) rotateX(63deg);
+        transform-origin: center bottom;
+        border: 1px solid rgba(170, 192, 235, 0.5);
+        border-radius: 30px 30px 22px 22px;
+        background: linear-gradient(
+          150deg,
+          rgba(247, 249, 255, 0.91),
+          rgba(198, 215, 246, 0.88)
+        );
+        box-shadow:
+          0 22px 35px rgba(65, 88, 141, 0.17),
+          inset 0 2px 0 rgba(255, 255, 255, 0.96);
+        pointer-events: none;
+      }
+      #memo-book-3d {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        filter: drop-shadow(0 12px 16px rgba(57, 75, 134, 0.22));
+      }
+      #memo-book-3d canvas {
+        display: block;
+        width: 100%;
         height: 100%;
-        overflow: hidden;
+        pointer-events: none;
+      }
+      .memo-drop-hint {
+        position: absolute;
         z-index: 2;
-
+        bottom: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 11px;
+        font-weight: 750;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+        color: #8293b7;
+        pointer-events: none;
+      }
+      #memo-drop-zone.is-over #memo-book-3d {
+        filter: drop-shadow(0 12px 24px rgba(79, 108, 222, 0.32));
+      }
+      #shred-zone {
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: clamp(90px, 12vw, 210px);
+        height: 100%;
+        z-index: 4;
+        overflow: hidden;
+        pointer-events: none;
+        color: rgba(255, 255, 255, 0.9);
         background: linear-gradient(
           90deg,
-          rgba(25, 28, 37, 0) 0%,
-          rgba(25, 28, 37, 0.72) 22%,
-          #14161d 53%,
-          #08090c 100%
+          rgba(14, 17, 25, 0),
+          rgba(16, 18, 25, 0.65) 26%,
+          rgba(9, 11, 17, 0.96) 75%,
+          #090a0d
         );
-
-        color: rgba(255, 255, 255, 0.9);
       }
-
       .shred-zone-content {
         position: absolute;
         inset: 0;
@@ -1673,91 +1966,142 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 14px;
-        padding: 15px;
-
+        gap: 12px;
+        text-align: center;
+        padding: 10px;
         pointer-events: none;
-        transition: transform 0.2s ease;
+        transition: transform 0.15s;
       }
-
-      .shred-zone-content svg {
-        filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.22));
-      }
-
       .shred-zone-content strong {
-        font-size: 13px;
-        letter-spacing: 0.18em;
+        font-size: 12px;
+        letter-spacing: 0.13em;
       }
-
       .shred-zone-content span {
         font-size: 10px;
-        opacity: 0.52;
-        text-align: center;
+        line-height: 1.4;
+        opacity: 0.62;
       }
-
-      /* 사진이 파기 구역 위에 오면 즉시 반응 */
       #shred-zone.is-over {
         background: linear-gradient(
           90deg,
-          rgba(35, 40, 52, 0) 0%,
-          rgba(50, 58, 77, 0.85) 25%,
-          #222633 100%
+          rgba(14, 17, 25, 0),
+          rgba(36, 43, 67, 0.82) 26%,
+          #171a28
         );
       }
-
       #shred-zone.is-over .shred-zone-content {
-        transform: scale(1.08);
+        transform: scale(1.07);
       }
-      /* 가위 구역을 별도 화면이 아닌 인화실 오른쪽에 배치 */
-      #world-track {
-        width: 200vw !important;
+      @media (max-width: 660px) {
+        #memo-drop-zone {
+          width: 90vw;
+          height: clamp(170px, 29vh, 250px);
+          bottom: -25px;
+        }
+        .memo-drop-hint {
+          bottom: 11px;
+        }
+        #memo-book-desk {
+          height: 70px;
+          bottom: 30px;
+        }
+        #shred-zone {
+          width: clamp(70px, 12vw, 100px);
+        }
+        #shred-zone .shred-zone-content svg {
+          width: 40px;
+          height: 40px;
+        }
+      }
+      /* ========================================================
+   PEN PATCH — index.html 스타일 마지막 부분에 추가
+   기존 편집기 스타일은 삭제하지 않음
+   ======================================================== */
+
+      /* 현재 크기에서 폴라로이드를 약 1.3배 키우고 왼쪽으로 확장 */
+      .editor-modal .editor-polaroid {
+        width: min(125%, 676px);
+        left: -23%;
+        transform: translateY(-54%) rotate(-7deg);
+        transform-origin: center center;
       }
 
-      #shred-zone {
-        position: absolute !important;
-        top: 0;
-        right: 0;
-        left: auto;
-
-        width: clamp(90px, 12vw, 210px);
+      /* 선은 팝업 표면 위에 얹히며, 밖으로 나온 사진 위까지 그려진다 */
+      .editor-modal .editor-ink-art {
+        position: absolute;
+        inset: 0;
+        width: 100%;
         height: 100%;
-        flex: none !important;
-        z-index: 3;
-        overflow: hidden;
-
-        background: linear-gradient(
-          90deg,
-          rgba(15, 17, 23, 0) 0%,
-          rgba(15, 17, 23, 0.55) 25%,
-          rgba(12, 13, 18, 0.9) 65%,
-          #08090c 100%
-        );
-
-        color: rgba(255, 255, 255, 0.92);
+        overflow: visible !important;
+        pointer-events: none;
+        z-index: 20;
+      }
+      .editor-modal .editor-ink-art path {
+        fill: none;
+        stroke: #9cdeff;
+        stroke-width: 3.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        vector-effect: non-scaling-stroke;
+        filter: drop-shadow(0 0 2px rgba(209, 244, 255, 0.35));
       }
 
-      /* ==========================================
-   모든 폴라로이드: 이미지 영역 꽉 채우기
-========================================== */
-
-      /* 메인 화면 랜덤 사진 3장 */
-      .cover-float-card img,
-
-/* 인화실 줄에 걸린 사진 */
-.hanging-polaroid img,
-
-/* 보관함 앨범 안 사진 */
-.album-photo img {
-        object-fit: cover !important;
-        object-position: center center !important;
-        background: transparent !important;
+      /* 사용자 SVG 그대로 사용. 활성화하면 흰 네온 표시 */
+      .editor-modal .editor-pen-toggle {
+        position: absolute;
+        left: 40%;
+        top: -46px;
+        width: 60px;
+        height: 112px;
+        border: 0;
+        padding: 8px;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        cursor: pointer;
+        z-index: 25;
+        transform: rotate(17deg);
+        transition: transform 0.15s ease;
+        touch-action: manipulation;
+      }
+      .editor-modal .editor-pen-toggle img {
+        display: block;
+        width: auto;
+        height: 90px;
+        max-width: 100%;
+        pointer-events: none;
+        transition: filter 0.18s ease;
+      }
+      .editor-modal .editor-pen-toggle.is-active {
+        transform: rotate(9deg) translateY(-3px);
+      }
+      .editor-modal .editor-pen-toggle.is-active img {
+        filter: drop-shadow(0 0 5px #fff)
+          drop-shadow(0 0 14px rgba(255, 255, 255, 0.98))
+          drop-shadow(0 0 23px rgba(215, 242, 255, 0.9)) brightness(1.15);
+      }
+      .editor-modal.editor-inking {
+        touch-action: none;
+        cursor: crosshair;
+      }
+      .editor-modal.editor-inking
+        *:not(.editor-pen-toggle):not(.editor-pen-toggle img) {
+        cursor: crosshair;
       }
 
-      /* 메모 편집창에서는 반드시 원본 비율 유지 */
-      .edit-image,
-      .viewer img {
-        object-fit: contain !important;
-        object-position: center center !important;
+      @media (max-width: 980px) {
+        .editor-modal .editor-polaroid {
+          width: min(101vw, 559px);
+          left: -12vw;
+        }
+        .editor-modal .editor-pen-toggle {
+          left: 49%;
+          top: -38px;
+          height: 91px;
+        }
+        .editor-modal .editor-pen-toggle img {
+          height: 76px;
+        }
       }
     </style>
     <!-- Three.js 모듈: glass3d.js와 동일한 버전 사용 -->
@@ -1825,35 +2169,31 @@
             <div id="rear-deco-layer" aria-hidden="true"></div>
             <div id="front-photo-layer"></div>
           </div>
-          <div id="memo-drop-zone">
+          <div id="memo-drop-zone" aria-label="사진을 놓아 메모를 작성하는 책">
+            <div id="memo-book-desk" aria-hidden="true"></div>
             <div id="memo-book-3d" aria-hidden="true"></div>
-            <span class="memo-drop-hint"> 사진을 책 위에 놓아주세요 </span>
+            <span class="memo-drop-hint">사진을 책 위에 놓아주세요</span>
+          </div>
+          <div id="shred-zone" aria-label="가위 사진 파기 구역">
+            <div class="shred-zone-content" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                width="72"
+                height="72"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="6" cy="6" r="3" />
+                <circle cx="6" cy="18" r="3" />
+                <path d="M8.1 8.1 20 20 M14.5 9.5 20 4 8.1 15.9" />
+              </svg>
+              <strong>CUT HERE</strong><span>사진을 놓으면 파기됩니다</span>
+            </div>
           </div>
           <div id="room-empty" hidden aria-hidden="true"></div>
-        </section>
-
-        <!-- 인화실 오른쪽: 가위 파기 구역 -->
-        <section id="shred-zone" aria-label="사진 파기 구역">
-          <div class="shred-zone-content">
-            <svg
-              viewBox="0 0 24 24"
-              width="78"
-              height="78"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="6" cy="6" r="3"></circle>
-              <circle cx="6" cy="18" r="3"></circle>
-              <path d="M8.1 8.1 20 20"></path>
-              <path d="M14.5 9.5 20 4 8.1 15.9"></path>
-            </svg>
-            <strong>CUT HERE</strong>
-            <span>사진을 놓으면 파기됩니다</span>
-          </div>
         </section>
       </div>
     </main>

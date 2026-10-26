@@ -108,35 +108,47 @@ function shuffleCoverPhotos(items) {
 }
 
 function coverPhotoPool() {
-  const all = [];
-
-  // 최소 일주일(7일) 전 보관한 사진만
-  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-
+  const cutoff = Date.now() - 7 * 86400000;
+  const rows = [];
   for (const [key, data] of saved) {
     if (!data?.image) continue;
-
-    // 새 기록은 실제 보관 시각을 사용.
-    // 예전 기록은 기존 저장된 시각을 대체 기준으로 사용.
+    // Old entries did not store savedAt; timestamp is a fallback, not exact archive date.
     const archivedAt =
       timestamp(data.savedAt) ??
       timestamp(data.archivedAt) ??
       timestamp(data.timestamp) ??
       timestamp(data.createdAt);
-
-    if (archivedAt === null || archivedAt > cutoff) {
-      continue;
-    }
-
-    all.push({
-      source: "locker",
-      key,
-      data,
-      t: memoTime(data),
-    });
+    if (archivedAt === null || archivedAt > cutoff) continue;
+    rows.push({ source: "locker", key, data, t: memoTime(data) });
   }
+  return rows;
+}
 
-  return all;
+function dailyShuffle(rows, day) {
+  // Deterministic Fisher-Yates: stable during a calendar day and after reload.
+  let seed = 2166136261;
+  const ordered = [...rows].sort((a, b) => a.key.localeCompare(b.key));
+  for (const ch of String(day) + ":" + ordered.map((x) => x.key).join("|")) {
+    seed = Math.imul(seed ^ ch.charCodeAt(0), 16777619) >>> 0;
+  }
+  for (let i = ordered.length - 1; i > 0; i--) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const j = seed % (i + 1);
+    [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+  }
+  return ordered;
+}
+
+function scheduleDailyCoverRefresh() {
+  const n = new Date();
+  const midnight = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1);
+  setTimeout(
+    () => {
+      drawCoverPolaroids();
+      scheduleDailyCoverRefresh();
+    },
+    Math.max(1000, midnight.getTime() - Date.now() + 250),
+  );
 }
 
 function applyCoverPhotoTilt() {
@@ -173,97 +185,41 @@ function applyCoverPhotoTilt() {
 function drawCoverPolaroids() {
   const host = $("cover-photo-floats");
   if (!host) return;
-
-  // 보관함에서 최소 7일 지난 사진만
-  const pool = coverPhotoPool().sort((a, b) =>
-    String(a.key).localeCompare(String(b.key)),
-  );
-
-  // 사진 목록을 일정한 무작위 순서로 섞기
-  // 같은 사진 목록이면 새로고침해도 순서 유지
-  let seed = 2166136261;
-
-  for (const item of pool) {
-    for (const char of String(item.key)) {
-      seed = Math.imul(seed ^ char.charCodeAt(0), 16777619) >>> 0;
-    }
-  }
-
-  const shuffled = [...pool];
-
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-
-    const j = seed % (i + 1);
-
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-
-  // 오늘 날짜를 기준으로 하루마다 선택 위치 변경
-  const today = new Date();
-
-  const dayNumber = Math.floor(
-    Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) / 86400000,
-  );
-
-  const count = Math.min(3, shuffled.length);
-  const start = shuffled.length ? dayNumber % shuffled.length : 0;
-
-  const chosen = [];
-
-  for (let i = 0; i < count; i++) {
-    chosen.push(shuffled[(start + i) % shuffled.length]);
-  }
-
-  coverFloatingIds = chosen.map((item) => itemId(item.source, item.key));
-
+  const today = localDay(Date.now());
+  const chosen = dailyShuffle(coverPhotoPool(), today).slice(0, 3);
+  const ids = chosen.map((x) => x.key).join("|") + ":" + today;
+  // Firebase updates can trigger frequent repaints; do not restart float animations.
+  if (host.dataset.currentPhotos === ids) return;
+  host.dataset.currentPhotos = ids;
   host.replaceChildren();
   host.hidden = chosen.length === 0;
-
-  // 선정한 사진으로 폴라로이드 만들기
+  coverFloatingIds = chosen.map((item) => itemId(item.source, item.key));
   chosen.forEach((item, index) => {
     const card = document.createElement("button");
-
     card.type = "button";
     card.className = `cover-float-card pos-${index + 1}`;
-
-    card.draggable = false;
     card.title = "사진을 눌러 메모 편집";
-
+    card.draggable = false;
     card.setAttribute(
       "aria-label",
       `${item.data.labelTxt || localDay(item.t)} 메모 편집`,
     );
-
     const img = new Image();
     img.src = item.data.image;
     img.alt = item.data.labelTxt || "기록된 사진";
     img.draggable = false;
-    img.loading = "lazy";
-
     const label = document.createElement("span");
     label.className = "cover-float-label";
-
     label.textContent =
       item.data.labelTxt?.trim() || localDay(item.t) || "MEMO";
-
     card.append(img, label);
-
-    card.addEventListener("contextmenu", (event) => event.preventDefault());
-
     card.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-
-      if (busy || batchMode) return;
-
-      openEditor("locker", item.key);
+      if (!busy && !batchMode) openEditor("locker", item.key);
     });
-
-    host.appendChild(card);
+    host.append(card);
   });
-
-  // 기존에 직접 조절한 사진 위치·회전·크기 유지
   applyCoverPhotoTilt();
 }
 
@@ -282,31 +238,6 @@ function goRoom(next) {
       : "smooth",
   });
 }
-
-function scheduleDailyCoverRefresh() {
-  const now = new Date();
-
-  // 다음 날 00:00
-  const midnight = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() + 1,
-    0,
-    0,
-    0,
-  );
-
-  const delay = midnight.getTime() - now.getTime() + 500;
-
-  setTimeout(
-    () => {
-      drawCoverPolaroids();
-      scheduleDailyCoverRefresh();
-    },
-    Math.max(1000, delay),
-  );
-}
-
 function setArchive(open) {
   if (batchMode || busy) return;
   archiveOpen = !!open;
@@ -426,25 +357,20 @@ function setupSwipes() {
   document.addEventListener(
     "touchstart",
     (event) => {
-      // 터치를 시작한 곳이 사진인지 확인
-      const touchedPhoto =
-        event.target instanceof Element &&
-        !!event.target.closest(
-          "#front-photo-layer .hanging-polaroid, " + ".cover-float-card",
-        );
-
       if (
         event.touches.length !== 1 ||
         batchMode ||
         busy ||
-        touchedPhoto ||
+        (event.target instanceof Element &&
+          !!event.target.closest(
+            "#front-photo-layer .hanging-polaroid,.cover-float-card,#memo-drop-zone,#shred-zone",
+          )) ||
         darkroomPhysics.photoDrag?.active ||
         document.querySelector(".overlay:not([hidden])")
       ) {
         verticalStart = null;
         return;
       }
-
       const touch = event.touches[0];
       verticalStart = {
         x: touch.clientX,
@@ -459,23 +385,9 @@ function setupSwipes() {
     "touchend",
     (event) => {
       if (!verticalStart || event.changedTouches.length !== 1) return;
-
       const start = verticalStart;
       verticalStart = null;
-
-      // 사진에서 시작한 터치는 절대로
-      // 보관함 열기 동작으로 처리하지 않음
-      if (
-        start.target instanceof Element &&
-        start.target.closest(
-          "#front-photo-layer .hanging-polaroid, " + ".cover-float-card",
-        )
-      ) {
-        return;
-      }
-
       const touch = event.changedTouches[0];
-
       const dx = touch.clientX - start.x;
       const dy = touch.clientY - start.y;
       if (Math.abs(dy) < 65 || Math.abs(dy) < Math.abs(dx) * 1.3) return;
@@ -650,7 +562,6 @@ function installPhotoInteraction(el, source, key) {
       toggleBatch(source, key);
       return;
     }
-
     if (source === "incoming" && el.classList.contains("hanging-polaroid"))
       return;
     openEditor(source, key);
@@ -671,9 +582,12 @@ const darkroomPhysics = {
   engine: null,
   lastTime: 0,
   started: false,
-  hasRendered: false,
   width: 0,
   height: 0,
+  photoDrag: null,
+  revealStarted: false,
+  nextSpawnAt: 0,
+  spawnGap: 250,
   reduced: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
 };
 
@@ -712,6 +626,7 @@ function updateDarkroomWires() {
     rear.setAttribute("y2", h * 0.16);
   }
   renderRearDarkroomDecor();
+  renderDarkroomBendingWire();
 }
 function renderRearDarkroomDecor() {
   const layer = $("rear-deco-layer");
@@ -753,505 +668,38 @@ function makeHangingPhoto(key, data, t) {
   return { card, img, label };
 }
 
-/* ======================================
-   PHOTO DRAG + FLEXIBLE WIRE
-   1단계: 줄에 연결된 상태로 잡아당기기
-====================================== */
-
-function darkroomDragOffset(t) {
-  const drag = darkroomPhysics.photoDrag;
-
-  if (!drag || !drag.moved) {
-    return { x: 0, y: 0 };
-  }
-
-  // 줄이 얼마나 팽팽한지 결정
-  // 작을수록 덜 늘어남
-  const MAX_PULL_X = 46;
-  const MAX_PULL_Y = 58;
-
-  // 잡아당긴 힘이 강해져도 무한정 늘어나지 않음
-  const pullX = MAX_PULL_X * Math.tanh(drag.dx / 90);
-  const pullY = MAX_PULL_Y * Math.tanh(drag.dy / 90);
-
-  // 잡은 부분 주변의 줄과 사진만 움직이기
-  const distance = (t - drag.t) / 0.16;
-  const influence = Math.exp(-0.5 * distance * distance);
-
-  // 줄의 왼쪽 끝과 오른쪽 끝은 고정
-  const edgeDistance = Math.max(0, Math.min(1, t / 0.07, (1 - t) / 0.07));
-
-  // 끝부분으로 갈수록 자연스럽게 당김이 줄어듦
-  const edgeLock = edgeDistance * edgeDistance * (3 - 2 * edgeDistance);
-
-  const strength = influence * edgeLock;
-
-  return {
-    x: pullX * strength,
-    y: pullY * strength,
-  };
-}
-
-/* ========================================
-   책 / 가위 구역 판정
-======================================== */
-
-function isInsideMemoTarget(id, clientX, clientY) {
-  const el = $(id);
-  if (!el || archiveOpen) return false;
-
-  const rect = el.getBoundingClientRect();
-
-  return (
-    clientX >= rect.left &&
-    clientX <= rect.right &&
-    clientY >= rect.top &&
-    clientY <= rect.bottom
-  );
-}
-
-/* ========================================
-   다른 곳에 놓으면 원래 줄로 복귀
-======================================== */
-
-function returnDarkroomPhotoToWire(hanger) {
-  if (!hanger || hanger.deleting) return;
-
-  // 현재 자유롭게 움직인 위치부터 복귀 시작
-  hanger.returning = {
-    fromX: hanger.freeX,
-    fromY: hanger.freeY,
-    start: performance.now(),
-  };
-
-  hanger.detached = false;
-  hanger.landed = true;
-  hanger.v = 0;
-  hanger.swing = 0;
-  hanger.swingV = 0;
-
-  hanger.el.classList.remove("detached");
-
-  // 사진이 다시 줄에 붙으므로 자리 재계산
-  reflowAttachedDarkroomPhotos();
-}
-
-/* ========================================
-   사진 파기: 흰 정삼각형이 퍼지는 효과
-======================================== */
-
-function playDarkroomShredEffect(clientX, clientY) {
-  const duration = 1000;
-  const count = 40;
-
-  for (let i = 0; i < count; i++) {
-    const particle = document.createElement("span");
-
-    // 기존보다 훨씬 큰 흰 정삼각형
-    const size = 18 + Math.random() * 28;
-    const angle = Math.random() * Math.PI * 2;
-    const distance = 60 + Math.random() * 150;
-
-    const dx = Math.cos(angle) * distance;
-    const dy = Math.sin(angle) * distance + 55;
-    const rotation = (Math.random() - 0.5) * 720;
-    const alpha = 0.4 + Math.random() * 0.5;
-
-    Object.assign(particle.style, {
-      position: "fixed",
-      left: `${clientX}px`,
-      top: `${clientY}px`,
-      width: `${size}px`,
-      height: `${size}px`,
-      background: "#ffffff",
-      clipPath: "polygon(50% 0%, 0% 86.6025%, 100% 86.6025%)",
-      pointerEvents: "none",
-      zIndex: "9999",
-    });
-
-    document.body.appendChild(particle);
-
-    const animation = particle.animate(
-      [
-        {
-          offset: 0,
-          transform: "translate(-50%, -50%) scale(0.3)",
-          opacity: 0,
-        },
-        {
-          offset: 0.1,
-          transform: "translate(-50%, -50%) scale(1)",
-          opacity: alpha,
-        },
-        {
-          offset: 1,
-          transform: `translate(-50%, -50%)
-             translate(${dx}px, ${dy}px)
-             rotate(${rotation}deg) scale(0.25)`,
-          opacity: 0,
-        },
-      ],
-      {
-        duration,
-        easing: "cubic-bezier(.15,.6,.35,1)",
-        fill: "forwards",
-      },
-    );
-
-    animation.finished.catch(() => {}).finally(() => particle.remove());
-  }
-}
-
-/* ========================================
-   가위 구역에 놓으면 Firebase에서 삭제
-======================================== */
-
-async function shredDarkroomPhoto(hanger, clientX, clientY) {
-  if (!hanger || hanger.deleting) return;
-
-  hanger.deleting = true;
-  hanger.el.style.pointerEvents = "none";
-
-  // 파기 효과 0.5초
-  playDarkroomShredEffect(clientX, clientY);
-
-  const fade = hanger.el.animate(
-    [
-      { opacity: 1, filter: "blur(0px)" },
-      { opacity: 0, filter: "blur(5px)" },
-    ],
-    {
-      duration: 1000,
-      easing: "ease-out",
-      fill: "forwards",
-    },
-  );
-
-  // 화면의 파기 효과가 끝난 뒤 실제 삭제
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  try {
-    await db.ref("incoming").child(hanger.key).remove();
-
-    // 기존 Firebase child_removed 구독에서
-    // 화면 제거와 사진 목록 갱신 처리
-  } catch (error) {
-    console.error("사진 파기 실패:", error);
-
-    fade.cancel();
-    hanger.el.style.pointerEvents = "auto";
-    hanger.deleting = false;
-
-    returnDarkroomPhotoToWire(hanger);
-
-    toast("삭제에 실패해 사진을 줄에 다시 걸었어요.");
-  }
-}
-
-function enableDarkroomPhotoDrag(card, key) {
-  card.style.touchAction = "none";
-  card.style.cursor = "grab";
-
-  let session = null;
-  let suppressClick = false;
-
-  // 사진 잡기
-  card.addEventListener("pointerdown", (event) => {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-
-    if (busy || batchMode || archiveOpen || darkroomPhysics.photoDrag?.active)
-      return;
-
-    const hanger = darkroomPhysics.items.get(key);
-
-    if (!hanger || !hanger.landed || hanger.deleting || hanger.returning)
-      return;
-
-    session = {
-      id: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      lastX: event.clientX,
-      lastY: event.clientY,
-      moved: false,
-    };
-  });
-
-  // 사진 움직이기
-  card.addEventListener("pointermove", (event) => {
-    if (!session || event.pointerId !== session.id) {
-      return;
-    }
-
-    const hanger = darkroomPhysics.items.get(key);
-    if (!hanger || hanger.deleting) return;
-
-    const dx = event.clientX - session.startX;
-    const dy = event.clientY - session.startY;
-
-    if (!session.moved && Math.hypot(dx, dy) < 7) return;
-
-    if (!session.moved) {
-      session.moved = true;
-      suppressClick = true;
-
-      card.classList.add("dragging");
-      card.style.cursor = "grabbing";
-
-      try {
-        card.setPointerCapture(event.pointerId);
-      } catch {}
-
-      if (!hanger.detached) {
-        darkroomPhysics.photoDrag = {
-          active: true,
-          moved: true,
-          t: hanger.t,
-          dx: 0,
-          dy: 0,
-        };
-      }
-    }
-
-    if (hanger.detached) {
-      // 분리된 사진은 자유롭게 이동
-      hanger.freeX += event.clientX - session.lastX;
-
-      hanger.freeY += event.clientY - session.lastY;
-    } else {
-      // 줄에 연결된 사진을 잡아당기기
-      const drag = darkroomPhysics.photoDrag;
-
-      if (drag) {
-        drag.dx = Math.max(-260, Math.min(260, dx));
-
-        drag.dy = Math.max(-230, Math.min(230, dy));
-      }
-
-      // 130px 이상 당기면 똑! 분리
-      if (Math.hypot(dx, dy) >= 130) {
-        const p = getDarkroomWirePoint(hanger.t);
-
-        hanger.detached = true;
-        hanger.freeX = p.x + dx;
-        hanger.freeY = p.y + dy;
-
-        hanger.swing = 0;
-        hanger.swingV = 0;
-
-        card.classList.add("detached");
-
-        if (drag) drag.active = false;
-
-        reflowAttachedDarkroomPhotos();
-        playDarkroomDetachEffect(hanger);
-      }
-    }
-
-    session.lastX = event.clientX;
-    session.lastY = event.clientY;
-
-    if (hanger.detached) {
-      card.style.left = `${hanger.freeX}px`;
-      card.style.top = `${hanger.freeY}px`;
-      card.style.transform = "translateX(-50%) rotate(0rad)";
-    }
-
-    // 책에 들어오는 즉시 페이지 반응
-    $("memo-drop-zone")?.classList.toggle(
-      "is-over",
-      hanger.detached &&
-        isInsideMemoTarget("memo-drop-zone", event.clientX, event.clientY),
-    );
-
-    // 가위 구역 진입 즉시 강조
-    $("shred-zone")?.classList.toggle(
-      "is-over",
-      hanger.detached &&
-        isInsideMemoTarget("shred-zone", event.clientX, event.clientY),
-    );
-
-    event.preventDefault();
-  });
-
-  // 사진 놓기
-  function release(event) {
-    if (!session || session.id !== event.pointerId) return;
-
-    const hanger = darkroomPhysics.items.get(key);
-    const moved = session.moved;
-
-    const onBook =
-      moved &&
-      hanger?.detached &&
-      event.type === "pointerup" &&
-      isInsideMemoTarget("memo-drop-zone", event.clientX, event.clientY);
-
-    const onShredder =
-      moved &&
-      hanger?.detached &&
-      event.type === "pointerup" &&
-      isInsideMemoTarget("shred-zone", event.clientX, event.clientY);
-
-    if (darkroomPhysics.photoDrag?.active) {
-      darkroomPhysics.photoDrag.active = false;
-    }
-
-    $("memo-drop-zone")?.classList.remove("is-over");
-    $("shred-zone")?.classList.remove("is-over");
-
-    card.classList.remove("dragging");
-    card.style.cursor = "grab";
-
-    session = null;
-
-    if (card.hasPointerCapture(event.pointerId)) {
-      try {
-        card.releasePointerCapture(event.pointerId);
-      } catch {}
-    }
-
-    if (!hanger?.detached || !moved) return;
-
-    if (onBook) {
-      // 책에 놓기 → 기존 편집창
-      requestAnimationFrame(() => {
-        openEditor("incoming", key);
-      });
-    } else if (onShredder) {
-      // 가위 구역 → 삼각형 효과 + 실제 삭제
-      shredDarkroomPhoto(hanger, event.clientX, event.clientY);
-    } else {
-      // 어느 쪽도 아니라면 원래 줄로 복귀
-      returnDarkroomPhotoToWire(hanger);
-    }
-  }
-
-  card.addEventListener("pointerup", release);
-  card.addEventListener("pointercancel", release);
-
-  // 드래그 직후 클릭 이벤트로 편집창이
-  // 잘못 열리는 것을 방지
-  card.addEventListener(
-    "click",
-    (event) => {
-      if (!suppressClick) return;
-
-      suppressClick = false;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    },
-    true,
-  );
-}
-
-function tickDarkroomPhotoDrag(dt) {
-  const drag = darkroomPhysics.photoDrag;
-
-  if (!drag || drag.active) return;
-
-  // 놓으면 자연스럽게 원래 줄 모양으로 복귀
-  const decay = Math.exp(-11 * dt);
-
-  drag.dx *= decay;
-  drag.dy *= decay;
-
-  if (Math.hypot(drag.dx, drag.dy) < 0.25) {
-    darkroomPhysics.photoDrag = null;
-  }
-}
-
-function prepareDarkroomBendingWire() {
-  const old = $("front-wire");
-
-  if (!old || old.tagName.toLowerCase() === "path") return;
-
-  // 기존 직선 SVG를 휘어질 수 있는 Path로 변경
-  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-
-  path.id = "front-wire";
-  path.setAttribute("fill", "none");
-  path.setAttribute("stroke-width", "1.6");
-  path.setAttribute("vector-effect", "non-scaling-stroke");
-
-  old.replaceWith(path);
-}
-
-function renderDarkroomBendingWire() {
-  const path = $("front-wire");
-
-  if (!path || path.tagName.toLowerCase() !== "path") return;
-
-  const width = darkroomPhysics.width * 2;
-
-  const height = darkroomPhysics.height || 700;
-  const points = [];
-
-  for (let i = 0; i <= 128; i++) {
-    const t = i / 128;
-    const offset = darkroomDragOffset(t);
-
-    const x = width * t + offset.x;
-    const y = height * (0.16 + 0.34 * t) + offset.y;
-
-    points.push(`${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`);
-  }
-
-  path.setAttribute("d", points.join(" "));
-}
-
-function createDarkroomHanger(key, data, t, newArrival) {
+function createDarkroomHanger(key, data, t) {
   const layer = $("front-photo-layer");
   const { card, img, label } = makeHangingPhoto(key, data, t);
-  enableDarkroomPhotoDrag(card, key);
   layer.append(card);
-
   const height = card.offsetHeight || 203;
   const width = card.offsetWidth || 168;
-  // 새 사진은 화면 바깥의 줄 위에서 시작한다.
-  const initialT = newArrival && !darkroomPhysics.reduced ? 0.39 : 0.89;
-  const point = getDarkroomWirePoint(initialT);
+  const initialT = 0.32; // cover book is in front, polaroid rides behind it.
   const hanger = {
     key,
     data,
     el: card,
     img,
     label,
+    cardH: height,
+    cardW: width,
     t: initialT,
     targetT: initialT,
+    spawnStartT: initialT,
+    spawnAt: Infinity,
+    landed: false,
     v: 0,
     swing: 0,
     swingV: 0,
-    landed: !newArrival,
-    body: null,
-    rope: null,
-    cardH: height,
-    cardW: width,
+    detached: false,
+    returning: null,
+    freeX: 0,
+    freeY: 0,
+    deleting: false,
   };
-
-  if (window.Matter && darkroomPhysics.engine) {
-    const M = window.Matter;
-    const body = M.Bodies.rectangle(
-      point.x,
-      point.y + height / 2,
-      width * 0.76,
-      height * 0.78,
-      { frictionAir: 0.14, restitution: 0.01, collisionFilter: { group: -1 } },
-    );
-    const rope = M.Constraint.create({
-      pointA: { x: point.x, y: point.y },
-      bodyB: body,
-      pointB: { x: 0, y: -height / 2 },
-      length: 0,
-      stiffness: 0.98,
-      damping: 0.38,
-    });
-    M.Composite.add(darkroomPhysics.engine.world, [body, rope]);
-    hanger.body = body;
-    hanger.rope = rope;
-  }
-
+  card.style.visibility = "hidden";
   darkroomPhysics.items.set(key, hanger);
+  enableDarkroomPhotoDrag(card, key);
   return hanger;
 }
 
@@ -1268,495 +716,499 @@ function removeDarkroomHanger(key) {
   darkroomPhysics.items.delete(key);
 }
 
-// Oldest photos settle closer to the lower right end; new ones arrive from
-// beyond the left edge and fill the available hanging positions.
+// Incoming key = Firebase push ID (chronological insertion order).
+function incomingChronologicalRows() {
+  return [...incoming]
+    .filter(([, d]) => d?.image)
+    .map(([key, data]) => ({ key, data, t: memoTime(data) }))
+    .sort((a, b) => {
+      const at = timestamp(a.data.timestamp) ?? 0;
+      const bt = timestamp(b.data.timestamp) ?? 0;
+      return at - bt || String(a.key).localeCompare(String(b.key));
+    });
+}
 
-function distributeDarkroomHangers(all) {
-  // 촬영 날짜가 아니라 실제로 들어온 순서를 기준으로 배치
-  const arrivalOrder = new Map(
-    [...incoming.keys()].map((key, index) => [key, index]),
+function distributeDarkroomHangers(all = incomingChronologicalRows()) {
+  const attached = all.filter((row) => {
+    const h = darkroomPhysics.items.get(row.key);
+    return h && !h.detached && !h.deleting;
+  });
+  if (!attached.length) return;
+  const width = Math.max(
+    1,
+    darkroomPhysics.width || $("darkroom-scene")?.clientWidth || 900,
   );
-
-  // 줄에서 분리된 사진은 자리 계산에서 제외
-  const attached = all
-    .filter((item) => {
-      const hanger = darkroomPhysics.items.get(item.key);
-      return hanger && !hanger.detached;
-    })
-    .sort(
-      (a, b) =>
-        (arrivalOrder.get(a.key) ?? Infinity) -
-        (arrivalOrder.get(b.key) ?? Infinity),
-    );
-
-  if (attached.length === 0) return;
-
-  const width = Math.max(1, darkroomPhysics.width || 900);
-
   const widest = Math.max(
-    168,
-    ...attached.map((item) => darkroomPhysics.items.get(item.key).cardW || 168),
+    110,
+    ...attached.map((row) => darkroomPhysics.items.get(row.key).cardW || 168),
   );
-
-  const margin = Math.min(width * 0.31, Math.max(22, widest * 0.8));
-
-  const minT = 0.5 + margin / (2 * width);
-
-  const shredZone = $("shred-zone");
-
-  // 가위 구역이 차지하는 실제 너비
-  const shredWidth = shredZone ? shredZone.getBoundingClientRect().width : 0;
-
-  // 폴라로이드 절반 너비 + 추가 안전거리 30px
-  const safeDistance = widest / 2 + 30;
-
-  // 사진의 오른쪽 끝이 가위 구역에 닿지 않도록 제한
-  const maxT = Math.max(minT, 1 - (shredWidth + safeDistance) / (2 * width));
-
-  // 간격을 일정하게 유지해서 빈자리 뒤의 사진만 이동하도록
-  const preferredStep = (widest + 78) / (2 * width);
-
+  const shredW = $("shred-zone")?.getBoundingClientRect().width || 0;
+  const safeGap = widest / 2 + 32;
+  const minT = 0.5 + (widest / 2 + 35) / (2 * width);
+  const maxT = Math.max(minT, 1 - (shredW + safeGap) / (2 * width));
+  const preferredStep = (widest + 25) / (2 * width);
   const step =
     attached.length > 1
       ? Math.min(preferredStep, (maxT - minT) / (attached.length - 1))
       : 0;
-
-  attached.forEach((item, index) => {
-    const hanger = darkroomPhysics.items.get(item.key);
-
-    // 오래전에 들어온 사진이 오른쪽
-    // 새로 들어온 사진일수록 왼쪽
-    hanger.targetT = maxT - index * step;
+  // oldest on right, newest on left. Removed card does not occupy a slot.
+  attached.forEach((row, i) => {
+    const h = darkroomPhysics.items.get(row.key);
+    h.targetT = maxT - i * step;
   });
 }
 
-// 사진을 떼어냈을 때 남은 자리들을 다시 계산
 function reflowAttachedDarkroomPhotos() {
-  const all = [...incoming]
-    .filter(([, data]) => data?.image)
-    .map(([key, data]) => ({
-      key,
-      data,
-      t: memoTime(data),
-    }));
-
-  distributeDarkroomHangers(all);
+  distributeDarkroomHangers(incomingChronologicalRows());
 }
 
-// 분리 순간에 작은 반짝임 효과
-function playDarkroomDetachEffect(hanger) {
-  const card = hanger.el;
-  const pieces = [];
-
-  const ring = document.createElement("span");
-
-  Object.assign(ring.style, {
-    position: "absolute",
-    left: "50%",
-    top: "-10px",
-    width: "24px",
-    height: "24px",
-    borderRadius: "50%",
-    border: "2px solid rgba(85,145,245,.88)",
-    boxShadow: "0 0 12px rgba(110,180,255,.55)",
-    pointerEvents: "none",
-    zIndex: "900",
+function beginDarkroomRevealOnce() {
+  if (darkroomPhysics.revealStarted) return;
+  const rows = incomingChronologicalRows();
+  if (!rows.length) return; // will start after Firebase arrives if already scrolled.
+  darkroomPhysics.revealStarted = true;
+  const first = performance.now();
+  rows.forEach((row, i) => {
+    const h = darkroomPhysics.items.get(row.key);
+    if (!h) return;
+    h.spawnAt = first + i * darkroomPhysics.spawnGap;
+    h.spawnStartT = 0.32;
+    h.t = h.spawnStartT;
+    h.landed = false;
   });
-
-  card.appendChild(ring);
-  pieces.push(ring);
-
-  ring.animate(
-    [
-      {
-        transform: "translate(-50%,-50%) scale(.3)",
-        opacity: 1,
-      },
-      {
-        transform: "translate(-50%,-50%) scale(1.9)",
-        opacity: 0,
-      },
-    ],
-    {
-      duration: 380,
-      easing: "ease-out",
-      fill: "forwards",
-    },
-  );
-
-  // 집게 주위에 작은 빛 입자 5개
-  for (let i = 0; i < 5; i++) {
-    const spark = document.createElement("span");
-
-    const angle = ((-135 + i * 68) * Math.PI) / 180;
-    const distance = 18 + (i % 2) * 10;
-
-    Object.assign(spark.style, {
-      position: "absolute",
-      left: "50%",
-      top: "-10px",
-      width: "5px",
-      height: "5px",
-      borderRadius: "50%",
-      background: i % 2 ? "#b6f1ff" : "#7fa4ff",
-      boxShadow: "0 0 6px rgba(130,180,250,.6)",
-      pointerEvents: "none",
-      zIndex: "901",
-    });
-
-    card.appendChild(spark);
-    pieces.push(spark);
-
-    spark.animate(
-      [
-        {
-          transform: "translate(-50%,-50%) scale(1)",
-          opacity: 1,
-        },
-        {
-          transform: `translate(-50%,-50%) translate(${
-            Math.cos(angle) * distance
-          }px,${Math.sin(angle) * distance}px) scale(.2)`,
-          opacity: 0,
-        },
-      ],
-      {
-        duration: 360,
-        easing: "ease-out",
-        fill: "forwards",
-      },
-    );
-  }
-
-  // 효과가 끝나면 임시 요소 제거
-  setTimeout(() => {
-    pieces.forEach((piece) => piece.remove());
-  }, 450);
+  darkroomPhysics.nextSpawnAt = first + rows.length * darkroomPhysics.spawnGap;
 }
 
 function initDarkroomLines() {
   if (darkroomPhysics.started) return;
   darkroomPhysics.started = true;
   updateDarkroomWires();
-  prepareDarkroomBendingWire();
-  renderDarkroomBendingWire();
-  if (window.Matter) {
-    const M = window.Matter;
-    darkroomPhysics.engine = M.Engine.create({ enableSleeping: false });
-    darkroomPhysics.engine.gravity.y = 2.15;
-    darkroomPhysics.engine.gravity.scale = 0.001;
-  } else {
-    console.warn("Matter.js를 불러오지 못해 기본 스프링 흔들림을 사용합니다.");
+  const front = $("front-wire");
+  if (front && front.tagName.toLowerCase() !== "path") {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.id = "front-wire";
+    path.setAttribute("fill", "none");
+    front.replaceWith(path);
   }
   darkroomPhysics.lastTime = performance.now();
   requestAnimationFrame(animateDarkroomLines);
   window.addEventListener("resize", () => {
     updateDarkroomWires();
-    for (const hanger of darkroomPhysics.items.values()) {
-      hanger.cardH = hanger.el.offsetHeight || hanger.cardH;
-      hanger.cardW = hanger.el.offsetWidth || hanger.cardW;
+    for (const h of darkroomPhysics.items.values()) {
+      h.cardH = h.el.offsetHeight || h.cardH;
+      h.cardW = h.el.offsetWidth || h.cardW;
     }
+    reflowAttachedDarkroomPhotos();
   });
 }
-
-/* =====================================
-   인화실 최초 등장: 페이지 로딩당 한 번
-===================================== */
-
-function beginDarkroomRevealOnce() {
-  // 이미 등장했다면 다시 실행하지 않음
-  if (darkroomPhysics.revealStarted) return;
-
-  const hangers = [...darkroomPhysics.items.values()];
-
-  // Firebase 사진을 아직 불러오지 않았다면 대기
-  if (!hangers.length) return;
-
-  darkroomPhysics.revealStarted = true;
-
-  const start = performance.now();
-
-  // 오래된 사진부터 순서대로 등장
-  hangers.sort((a, b) => memoTime(a.data) - memoTime(b.data));
-
-  hangers.forEach((hanger, i) => {
-    // 사진마다 0.6초 간격으로 출발
-    hanger.spawnAt = start + i * 250;
-
-    // 책 안쪽에서 출발
-    hanger.t = 0.32;
-    hanger.v = 0;
-
-    hanger.landed = false;
-    hanger.swing = 0;
-    hanger.swingV = 0;
-
-    hanger.el.style.visibility = "hidden";
-  });
-}
-
-/* =====================================
-   인화실 사진 그리기
-===================================== */
 
 function drawDarkroom() {
   initDarkroomLines();
-
-  const all = [...incoming]
-    .filter(([, data]) => data?.image)
-    .map(([key, data]) => ({
-      key,
-      data,
-      t: memoTime(data),
-    }))
-    .sort((a, b) => a.t - b.t);
-
+  const all = incomingChronologicalRows();
   $("incoming-count").textContent = `${pad(all.length)} PHOTOS`;
-
   $("room-empty").hidden = all.length > 0;
-
-  const ids = new Set(all.map((item) => item.key));
-
-  // 삭제된 사진은 화면에서도 제거
+  const activeKeys = new Set(all.map((x) => x.key));
   for (const key of [...darkroomPhysics.items.keys()]) {
-    if (!ids.has(key)) {
-      removeDarkroomHanger(key);
-    }
+    if (!activeKeys.has(key)) removeDarkroomHanger(key);
   }
-
-  const addedKeys = [];
-
-  // 기존 사진 유지, 새 사진만 생성
   for (const { key, data, t } of all) {
-    let hanger = darkroomPhysics.items.get(key);
-
-    if (!hanger) {
-      hanger = createDarkroomHanger(key, data, t, true);
-
-      addedKeys.push(key);
-    } else if (hanger.data.image !== data.image) {
-      hanger.img.src = data.image;
+    let h = darkroomPhysics.items.get(key);
+    if (!h) {
+      h = createDarkroomHanger(key, data, t);
+      if (darkroomPhysics.revealStarted) {
+        const now = performance.now();
+        h.spawnAt = Math.max(now, darkroomPhysics.nextSpawnAt);
+        darkroomPhysics.nextSpawnAt = h.spawnAt + darkroomPhysics.spawnGap;
+      }
+    } else if (h.data.image !== data.image) {
+      h.img.src = data.image;
     }
-
-    hanger.data = data;
-    hanger.label.textContent = localDay(t);
+    h.data = data;
+    h.label.textContent = localDay(t);
   }
-
   distributeDarkroomHangers(all);
-
-  // 기존 사진의 출발 시간은 변경하지 않음
-  let nextSpawn = Math.max(
-    performance.now(),
-    ...[...darkroomPhysics.items.values()]
-      .filter((h) => !addedKeys.includes(h.key) && Number.isFinite(h.spawnAt))
-      .map((h) => h.spawnAt + 600),
-  );
-
-  for (const key of addedKeys) {
-    const hanger = darkroomPhysics.items.get(key);
-
-    hanger.t = 0.39;
-    hanger.v = 0;
-    hanger.swing = 0;
-    hanger.swingV = 0;
-    hanger.landed = false;
-
-    hanger.el.style.visibility = "hidden";
-
-    if (darkroomPhysics.revealStarted) {
-      // 첫 등장 이후 새로 불러온 사진만
-      // 개별적으로 줄을 타고 등장
-      hanger.spawnAt = nextSpawn;
-      nextSpawn += 600;
-    } else {
-      // 화면을 1/3 밀기 전까지 대기
-      hanger.spawnAt = Infinity;
-    }
-  }
-
-  darkroomPhysics.hasRendered = true;
-
-  // 사용자가 먼저 스크롤한 뒤 사진이
-  // Firebase에서 늦게 로딩돼도 정상 실행
-  if ((Number(window.__ctmRoomProgress) || 0) >= 1 / 3) {
+  if ((Number(window.__ctmRoomProgress) || 0) >= 1 / 3)
     beginDarkroomRevealOnce();
+}
+
+// Tight, connected wire deformation; ends remain anchored.
+function darkroomDragOffset(t) {
+  const drag = darkroomPhysics.photoDrag;
+  if (!drag || !drag.moved) return { x: 0, y: 0 };
+  const pullX = 46 * Math.tanh(drag.dx / 90);
+  const pullY = 58 * Math.tanh(drag.dy / 90);
+  const distance = (t - drag.t) / 0.16;
+  const influence = Math.exp(-0.5 * distance * distance);
+  const edge = Math.max(0, Math.min(1, t / 0.07, (1 - t) / 0.07));
+  const lock = edge * edge * (3 - 2 * edge);
+  return { x: pullX * influence * lock, y: pullY * influence * lock };
+}
+
+function tickDarkroomPhotoDrag(dt) {
+  const drag = darkroomPhysics.photoDrag;
+  if (!drag || drag.active) return;
+  const decay = Math.exp(-11 * dt);
+  drag.dx *= decay;
+  drag.dy *= decay;
+  if (Math.hypot(drag.dx, drag.dy) < 0.25) darkroomPhysics.photoDrag = null;
+}
+
+function renderDarkroomBendingWire() {
+  const path = $("front-wire");
+  if (!path || path.tagName.toLowerCase() !== "path") return;
+  const width = 2 * (darkroomPhysics.width || 900);
+  const height = darkroomPhysics.height || 700;
+  const cmds = [];
+  for (let i = 0; i <= 128; i++) {
+    const t = i / 128,
+      o = darkroomDragOffset(t);
+    cmds.push(
+      `${i ? "L" : "M"}${(width * t + o.x).toFixed(1)},${(height * (0.16 + 0.34 * t) + o.y).toFixed(1)}`,
+    );
+  }
+  path.setAttribute("d", cmds.join(" "));
+}
+
+function isInsideMemoTarget(id, x, y) {
+  const el = $(id);
+  if (!el || archiveOpen) return false;
+  const r = el.getBoundingClientRect();
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+
+function playDarkroomDetachEffect(h) {
+  const card = h.el;
+  if (!card?.isConnected) return;
+  const ring = document.createElement("span");
+  ring.className = "ctm-detach-ring";
+  card.append(ring);
+  ring
+    .animate(
+      [
+        { transform: "translate(-50%,-50%) scale(.2)", opacity: 1 },
+        { transform: "translate(-50%,-50%) scale(2)", opacity: 0 },
+      ],
+      { duration: 370, easing: "ease-out" },
+    )
+    .finished.catch(() => {})
+    .finally(() => ring.remove());
+  for (let i = 0; i < 5; i++) {
+    const spark = document.createElement("span");
+    spark.className = "ctm-detach-spark";
+    card.append(spark);
+    const a = ((-130 + i * 65) * Math.PI) / 180;
+    spark
+      .animate(
+        [
+          { transform: "translate(-50%,-50%)", opacity: 1 },
+          {
+            transform: `translate(calc(-50% + ${Math.cos(a) * 25}px), calc(-50% + ${Math.sin(a) * 25}px)) scale(.1)`,
+            opacity: 0,
+          },
+        ],
+        { duration: 380, easing: "ease-out" },
+      )
+      .finished.catch(() => {})
+      .finally(() => spark.remove());
   }
 }
 
-// Horizontal swiping creates an impulse on the pendulum bodies. It does NOT
-// alter the world scroll position or the book-opening animation.
+function returnDarkroomPhotoToWire(h) {
+  if (!h || h.deleting) return;
+  h.returning = { fromX: h.freeX, fromY: h.freeY, start: performance.now() };
+  h.detached = false;
+  h.landed = true;
+  h.v = 0;
+  h.swing = 0;
+  h.swingV = 0;
+  h.el.classList.remove("detached");
+  reflowAttachedDarkroomPhotos();
+}
+
+function playDarkroomShredEffect(clientX, clientY) {
+  const duration = 1000;
+  for (let i = 0; i < 40; i++) {
+    const el = document.createElement("span");
+    const size = 18 + Math.random() * 28;
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 60 + Math.random() * 150;
+    const dx = Math.cos(angle) * distance,
+      dy = Math.sin(angle) * distance + 55;
+    const rotation = (Math.random() - 0.5) * 720;
+    el.style.cssText =
+      `position:fixed;left:${clientX}px;top:${clientY}px;width:${size}px;height:${size}px;` +
+      `background:#fff;clip-path:polygon(50% 0%,0% 86.6025%,100% 86.6025%);` +
+      `opacity:0;pointer-events:none;z-index:9999`;
+    document.body.append(el);
+    const fade = el.animate(
+      [
+        { offset: 0, transform: "translate(-50%,-50%) scale(.3)", opacity: 0 },
+        {
+          offset: 0.1,
+          transform: "translate(-50%,-50%) scale(1)",
+          opacity: 0.4 + Math.random() * 0.5,
+        },
+        {
+          offset: 1,
+          transform: `translate(-50%,-50%) translate(${dx}px,${dy}px) rotate(${rotation}deg) scale(.25)`,
+          opacity: 0,
+        },
+      ],
+      { duration, easing: "cubic-bezier(.15,.6,.35,1)" },
+    );
+    fade.finished.catch(() => {}).finally(() => el.remove());
+  }
+}
+
+async function shredDarkroomPhoto(h, x, y) {
+  if (!h || h.deleting) return;
+  h.deleting = true;
+  h.el.style.pointerEvents = "none";
+  playDarkroomShredEffect(x, y);
+  const fade = h.el.animate(
+    [
+      { opacity: 1, filter: "blur(0px)" },
+      { opacity: 0, filter: "blur(5px)" },
+    ],
+    { duration: 1000, easing: "ease-out", fill: "forwards" },
+  );
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  try {
+    await db.ref("incoming").child(h.key).remove();
+  } catch (err) {
+    console.error("사진 파기 실패", err);
+    fade.cancel();
+    h.el.style.pointerEvents = "auto";
+    h.deleting = false;
+    returnDarkroomPhotoToWire(h);
+    toast("삭제 실패: 사진을 다시 줄에 걸었어요.");
+  }
+}
+
+function enableDarkroomPhotoDrag(card, key) {
+  card.style.touchAction = "none";
+  card.style.cursor = "grab";
+  let session = null,
+    suppressClick = false;
+  card.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (busy || batchMode || archiveOpen || darkroomPhysics.photoDrag?.active)
+      return;
+    const h = darkroomPhysics.items.get(key);
+    if (!h || !h.landed || h.deleting || h.returning) return;
+    session = {
+      id: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      moved: false,
+    };
+  });
+  card.addEventListener("pointermove", (event) => {
+    if (!session || event.pointerId !== session.id) return;
+    const h = darkroomPhysics.items.get(key);
+    if (!h || h.deleting) return;
+    const dx = event.clientX - session.startX,
+      dy = event.clientY - session.startY;
+    if (!session.moved && Math.hypot(dx, dy) < 7) return;
+    if (!session.moved) {
+      session.moved = true;
+      suppressClick = true;
+      card.classList.add("dragging");
+      card.style.cursor = "grabbing";
+      try {
+        card.setPointerCapture(event.pointerId);
+      } catch {}
+      if (!h.detached)
+        darkroomPhysics.photoDrag = {
+          active: true,
+          moved: true,
+          t: h.t,
+          dx: 0,
+          dy: 0,
+        };
+    }
+    if (h.detached) {
+      h.freeX += event.clientX - session.lastX;
+      h.freeY += event.clientY - session.lastY;
+    } else {
+      const drag = darkroomPhysics.photoDrag;
+      if (drag) {
+        drag.dx = Math.max(-260, Math.min(260, dx));
+        drag.dy = Math.max(-230, Math.min(230, dy));
+      }
+      if (Math.hypot(dx, dy) >= 130) {
+        const p = getDarkroomWirePoint(h.t);
+        h.detached = true;
+        // Keep the release at the previous elastic position: no sudden jump.
+        const o = darkroomDragOffset(h.t);
+        h.freeX = p.x + o.x;
+        h.freeY = p.y + o.y;
+        h.swing = 0;
+        h.swingV = 0;
+        card.classList.add("detached");
+        if (drag) drag.active = false;
+        reflowAttachedDarkroomPhotos();
+        playDarkroomDetachEffect(h);
+      }
+    }
+    session.lastX = event.clientX;
+    session.lastY = event.clientY;
+    const detached = !!h.detached;
+    $("memo-drop-zone")?.classList.toggle(
+      "is-over",
+      detached &&
+        isInsideMemoTarget("memo-drop-zone", event.clientX, event.clientY),
+    );
+    $("shred-zone")?.classList.toggle(
+      "is-over",
+      detached &&
+        isInsideMemoTarget("shred-zone", event.clientX, event.clientY),
+    );
+    event.preventDefault();
+  });
+  function end(event) {
+    if (!session || event.pointerId !== session.id) return;
+    const h = darkroomPhysics.items.get(key);
+    const moved = session.moved;
+    const onBook =
+      moved &&
+      h?.detached &&
+      event.type === "pointerup" &&
+      isInsideMemoTarget("memo-drop-zone", event.clientX, event.clientY);
+    const onShred =
+      moved &&
+      h?.detached &&
+      event.type === "pointerup" &&
+      isInsideMemoTarget("shred-zone", event.clientX, event.clientY);
+    if (darkroomPhysics.photoDrag?.active)
+      darkroomPhysics.photoDrag.active = false;
+    $("memo-drop-zone")?.classList.remove("is-over");
+    $("shred-zone")?.classList.remove("is-over");
+    card.classList.remove("dragging");
+    card.style.cursor = "grab";
+    session = null;
+    if (card.hasPointerCapture(event.pointerId))
+      try {
+        card.releasePointerCapture(event.pointerId);
+      } catch {}
+    if (!h?.detached || !moved) return;
+    if (onBook) requestAnimationFrame(() => openEditor("incoming", key));
+    else if (onShred) shredDarkroomPhoto(h, event.clientX, event.clientY);
+    else returnDarkroomPhotoToWire(h);
+  }
+  card.addEventListener("pointerup", end);
+  card.addEventListener("pointercancel", end);
+  card.addEventListener(
+    "click",
+    (event) => {
+      if (!suppressClick) return;
+      suppressClick = false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    },
+    true,
+  );
+}
 
 function nudgeDarkroomPhotos(deltaX) {
   const impulse = Math.max(-30, Math.min(30, deltaX));
-
-  for (const hanger of darkroomPhysics.items.values()) {
-    if (!hanger.landed) continue;
-
-    // 스크롤 속도가 빠를수록 큰 충격
-    hanger.swingV -= impulse * 0.045;
-
-    // 무한히 커지지 않도록 제한
-    hanger.swingV = Math.max(-3.2, Math.min(3.2, hanger.swingV));
+  for (const h of darkroomPhysics.items.values()) {
+    if (!h.landed || h.detached) continue;
+    h.swingV = Math.max(-3.2, Math.min(3.2, h.swingV - impulse * 0.045));
   }
 }
 
 function animateDarkroomLines(now) {
   requestAnimationFrame(animateDarkroomLines);
-
   if (document.hidden) {
     darkroomPhysics.lastTime = now;
     return;
   }
-
   const dt = Math.max(
     0.001,
     Math.min(0.033, (now - darkroomPhysics.lastTime) / 1000),
   );
-
   darkroomPhysics.lastTime = now;
   tickDarkroomPhotoDrag(dt);
-
-  // 줄 이동 전체 시간: 2.8초
   const RIDE_DURATION = 2800;
-  const START_T = 0.32;
-
-  for (const hanger of darkroomPhysics.items.values()) {
-    // 최초 등장 전이거나 출발 순서가 아니면 숨기기
-    if (!darkroomPhysics.revealStarted || now < hanger.spawnAt) {
-      hanger.el.style.visibility = "hidden";
+  for (const h of darkroomPhysics.items.values()) {
+    if (!darkroomPhysics.revealStarted || now < h.spawnAt) {
+      h.el.style.visibility = "hidden";
       continue;
     }
-
-    hanger.el.style.visibility = "visible";
-
+    // 0.32 starts under the 3D cover book; first visible part is after book edge.
+    const elapsed = Math.max(0, now - h.spawnAt);
+    const u = Math.min(1, elapsed / RIDE_DURATION);
     if (darkroomPhysics.reduced) {
-      hanger.t = hanger.targetT;
-      hanger.landed = true;
-      hanger.swing = 0;
-      hanger.swingV = 0;
-    } else {
-      // =====================================
-      // A. 짚라인 이동: Ease Out Cubic
-      // =====================================
-
-      if (!hanger.landed) {
-        const elapsed = Math.max(0, now - hanger.spawnAt);
-
-        const u = Math.min(1, elapsed / RIDE_DURATION);
-
-        // 처음에는 빠르고 도착할수록 부드럽게 감속
-        const easeOut = 1 - Math.pow(1 - u, 3);
-
-        hanger.t = START_T + (hanger.targetT - START_T) * easeOut;
-
-        // 이동하는 동안은 크게 흔들리지 않음
-        hanger.swing *= Math.exp(-7 * dt);
-        hanger.swingV *= Math.exp(-7 * dt);
-
-        // =====================================
-        // B. 도착 후 집게에서 짧게 덜렁임
-        // =====================================
-
-        if (u >= 1) {
-          hanger.t = hanger.targetT;
-          hanger.landed = true;
-
-          // 도착하면 기울어지지 않고 바로 정지
-          hanger.swing = 0;
-          hanger.swingV = 0;
-        }
-      }
-
-      // =====================================
-      // C. 도착 후 진자 운동
-      // =====================================
-
-      const acceleration = -115 * Math.sin(hanger.swing) - 8.5 * hanger.swingV;
-
-      hanger.swingV += acceleration * dt;
-      hanger.swing += hanger.swingV * dt;
-
-      hanger.swing = Math.max(-0.35, Math.min(0.35, hanger.swing));
-
-      if (
-        hanger.landed &&
-        Math.abs(hanger.swing) < 0.001 &&
-        Math.abs(hanger.swingV) < 0.012
-      ) {
-        hanger.swing = 0;
-        hanger.swingV = 0;
-      }
-    }
-
-    // =====================================
-    // D. 사진 위치 및 회전 적용
-    // =====================================
-
-    // 줄에 붙어 있는 사진만 새 목표 위치로 부드럽게 이동
-    if (!hanger.detached && hanger.landed && Number.isFinite(hanger.targetT)) {
-      const follow = 1 - Math.exp(-8 * dt);
-
-      hanger.t += (hanger.targetT - hanger.t) * follow;
-
-      if (Math.abs(hanger.targetT - hanger.t) < 0.00025) {
-        hanger.t = hanger.targetT;
-      }
-    }
-    const p = getDarkroomWirePoint(hanger.t);
-    const offset = darkroomDragOffset(hanger.t);
-
-    if (hanger.returning) {
-      // 분리된 사진이 원래 줄로 돌아오는 중
-      const duration = 460;
-
-      const u = Math.min(1, (now - hanger.returning.start) / duration);
-
-      const eased = 1 - Math.pow(1 - u, 3);
-
-      const fromX = hanger.returning.fromX;
-      const fromY = hanger.returning.fromY;
-
-      const toX = p.x + offset.x;
-      const toY = p.y + offset.y;
-
-      const x = fromX + (toX - fromX) * eased;
-      const y = fromY + (toY - fromY) * eased;
-
-      hanger.el.style.left = `${x}px`;
-      hanger.el.style.top = `${y}px`;
-      hanger.el.style.transform = "translateX(-50%) rotate(0rad)";
-      hanger.el.style.zIndex = "500";
-
+      h.t = h.targetT;
+      h.landed = true;
+      h.swing = 0;
+      h.swingV = 0;
+    } else if (!h.landed && !h.detached && !h.returning) {
+      const ease = 1 - Math.pow(1 - u, 3);
+      h.t = h.spawnStartT + (h.targetT - h.spawnStartT) * ease;
+      h.swing = 0;
+      h.swingV = 0;
       if (u >= 1) {
-        hanger.returning = null;
+        h.t = h.targetT;
+        h.landed = true;
+        h.swing = 0;
+        h.swingV = 0;
       }
-    } else if (hanger.detached) {
-      // 줄에서 분리되어 드래그 중인 사진
-      hanger.el.style.left = `${hanger.freeX}px`;
-      hanger.el.style.top = `${hanger.freeY}px`;
-      hanger.el.style.transform = "translateX(-50%) rotate(0rad)";
-      hanger.el.style.zIndex = "500";
-    } else {
-      // 줄에 정상적으로 매달린 사진
-      hanger.el.style.left = `${p.x + offset.x}px`;
-
-      hanger.el.style.top = `${p.y + offset.y}px`;
-
-      hanger.el.style.transform = `translateX(-50%) rotate(${hanger.swing}rad)`;
-
-      hanger.el.style.zIndex = String(5 + Math.round(hanger.targetT * 100));
+    } else if (h.landed && !h.detached && !h.returning) {
+      const force = -115 * Math.sin(h.swing) - 8.5 * h.swingV;
+      h.swingV += force * dt;
+      h.swing += h.swingV * dt;
+      h.swing = Math.max(-0.35, Math.min(0.35, h.swing));
+      if (Math.abs(h.swing) < 0.001 && Math.abs(h.swingV) < 0.012) {
+        h.swing = 0;
+        h.swingV = 0;
+      }
     }
-
+    if (!h.detached && !h.returning && h.landed && Number.isFinite(h.targetT)) {
+      const follow = 1 - Math.exp(-8 * dt);
+      h.t += (h.targetT - h.t) * follow;
+      if (Math.abs(h.targetT - h.t) < 0.00025) h.t = h.targetT;
+    }
+    const p = getDarkroomWirePoint(h.t);
+    const o = darkroomDragOffset(h.t);
+    if (h.returning) {
+      const q = Math.min(1, Math.max(0, (now - h.returning.start) / 460));
+      const ease = 1 - Math.pow(1 - q, 3);
+      h.el.style.left = `${h.returning.fromX + (p.x + o.x - h.returning.fromX) * ease}px`;
+      h.el.style.top = `${h.returning.fromY + (p.y + o.y - h.returning.fromY) * ease}px`;
+      h.el.style.transform = "translateX(-50%) rotate(0rad)";
+      h.el.style.zIndex = "500";
+      if (q >= 1) h.returning = null;
+    } else if (h.detached) {
+      h.el.style.left = `${h.freeX}px`;
+      h.el.style.top = `${h.freeY}px`;
+      h.el.style.transform = "translateX(-50%) rotate(0rad)";
+      h.el.style.zIndex = "500";
+    } else {
+      h.el.style.left = `${p.x + o.x}px`;
+      h.el.style.top = `${p.y + o.y}px`;
+      h.el.style.transform = `translateX(-50%) rotate(${h.swing}rad)`;
+      h.el.style.zIndex = String(5 + Math.round(h.targetT * 100));
+    }
+    // Card is behind the cover's 3D book during the initial section.
+    // Alpha ramps up as it reaches the far edge of that book, with no teleport.
+    const appear = Math.max(0, Math.min(1, (h.t - 0.41) / 0.13));
+    h.el.style.opacity =
+      h.detached || h.returning || h.landed ? "1" : String(appear);
+    h.el.style.visibility = "visible";
     if (
       darkroomPhysics.photoDrag?.active &&
-      Math.abs(darkroomPhysics.photoDrag.t - hanger.t) < 0.001
-    ) {
-      hanger.el.style.zIndex = "500";
-    }
+      Math.abs(darkroomPhysics.photoDrag.t - h.t) < 0.001
+    )
+      h.el.style.zIndex = "500";
   }
-
   renderDarkroomBendingWire();
 }
+
+// Photo movement is implemented in animateDarkroomLines above.
 
 // -------------------------------------------------------------------
 // 4. 보관함: 날짜 1개=1페이지, 날짜 2개=1권
@@ -2470,163 +1922,461 @@ function makeField(label, initial = "") {
   field.append(lab, input);
   return { field, input };
 }
+/* =====================================================
+   EDITOR INK — 펜 버튼 + 사진/글 위 드로잉 + 저장
+   sketch.js에서 function openEditor(...) 바로 위에 붙여넣기
+   ===================================================== */
+function setupEditorInk({ layer, box, polaroid, data }) {
+  const ns = "http://www.w3.org/2000/svg";
+  const ink = document.createElementNS(ns, "svg");
+  ink.classList.add("editor-ink-art");
+  ink.setAttribute("viewBox", "0 0 1000 1000");
+  ink.setAttribute("preserveAspectRatio", "none");
+  ink.setAttribute("aria-hidden", "true");
+  box.appendChild(ink);
+
+  const pen = document.createElement("button");
+  pen.type = "button";
+  pen.className = "editor-pen-toggle";
+  pen.title = "그리기 켜기";
+  pen.setAttribute("aria-label", "그리기 켜기");
+  pen.setAttribute("aria-pressed", "false");
+  const penImage = new Image();
+  penImage.src = "./pen.svg";
+  penImage.alt = "";
+  penImage.draggable = false;
+  pen.appendChild(penImage);
+  box.appendChild(pen);
+
+  // 모든 좌표는 팝업 크기 기준 0~1로 저장한다.
+  // 크기가 바뀌어도 선을 다시 표시할 수 있다.
+  const strokes = Array.isArray(data.memoInk)
+    ? data.memoInk
+        .filter((s) => Array.isArray(s) && s.length > 0)
+        .slice(0, 400)
+        .map((s) =>
+          s
+            .filter(
+              (p) =>
+                Array.isArray(p) &&
+                p.length >= 2 &&
+                Number.isFinite(Number(p[0])) &&
+                Number.isFinite(Number(p[1])),
+            )
+            .slice(0, 1500)
+            .map((p) => [Number(p[0]), Number(p[1])]),
+        )
+        .filter((s) => s.length)
+    : [];
+
+  let active = false;
+  let pointerId = null;
+  let currentStroke = null;
+  let disposed = false;
+
+  function makePoint(clientX, clientY) {
+    const r = box.getBoundingClientRect();
+    return [
+      Math.round(((clientX - r.left) / Math.max(1, r.width)) * 10000) / 10000,
+      Math.round(((clientY - r.top) / Math.max(1, r.height)) * 10000) / 10000,
+    ];
+  }
+
+  function isInside(x, y) {
+    const rects = [
+      box.getBoundingClientRect(),
+      polaroid.getBoundingClientRect(),
+    ];
+    return rects.some(
+      (r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom,
+    );
+  }
+
+  function updateInk() {
+    ink.replaceChildren();
+    for (const points of strokes) {
+      if (!points.length) continue;
+      const path = document.createElementNS(ns, "path");
+      const commands = points.map(
+        (p, i) =>
+          `${i ? "L" : "M"}${(p[0] * 1000).toFixed(2)} ${(p[1] * 1000).toFixed(2)}`,
+      );
+      if (points.length === 1) {
+        commands.push(`l 0.05 0.05`);
+      }
+      path.setAttribute("d", commands.join(" "));
+      ink.appendChild(path);
+    }
+  }
+
+  function finishStroke() {
+    pointerId = null;
+    currentStroke = null;
+  }
+
+  function toggle() {
+    active = !active;
+    if (!active) finishStroke();
+    pen.classList.toggle("is-active", active);
+    box.classList.toggle("editor-inking", active);
+    pen.setAttribute("aria-pressed", String(active));
+    pen.setAttribute("aria-label", active ? "그리기 끄기" : "그리기 켜기");
+    pen.title = active ? "그리기 끄기" : "그리기 켜기";
+  }
+  pen.addEventListener("click", toggle);
+
+  // 기존 폴라로이드 클릭/날짜 선택/메모 입력 이벤트보다 먼저 처리.
+  // 펜을 끄면 이벤트를 가로채지 않아 기존 편집 기능이 돌아온다.
+  function down(e) {
+    if (!active || disposed || pen.contains(e.target)) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (!isInside(e.clientX, e.clientY)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (pointerId !== null) return;
+    pointerId = e.pointerId;
+    currentStroke = [makePoint(e.clientX, e.clientY)];
+    strokes.push(currentStroke);
+    updateInk();
+  }
+
+  function move(e) {
+    if (!active || disposed || pointerId !== e.pointerId || !currentStroke)
+      return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const next = makePoint(e.clientX, e.clientY);
+    const previous = currentStroke[currentStroke.length - 1];
+    const r = box.getBoundingClientRect();
+    const pixels = Math.hypot(
+      (next[0] - previous[0]) * r.width,
+      (next[1] - previous[1]) * r.height,
+    );
+    if (pixels >= 1.8 && currentStroke.length < 1500) {
+      currentStroke.push(next);
+      updateInk();
+    }
+  }
+
+  function up(e) {
+    if (pointerId !== e.pointerId) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (currentStroke && currentStroke.length < 1500) {
+      currentStroke.push(makePoint(e.clientX, e.clientY));
+      updateInk();
+    }
+    finishStroke();
+  }
+
+  function interceptClick(e) {
+    // 펜 활성화 중에는 펜 이외의 누름을 편집/저장으로 처리하지 않음.
+    if (active && !pen.contains(e.target) && isInside(e.clientX, e.clientY)) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  }
+
+  document.addEventListener("pointerdown", down, true);
+  document.addEventListener("pointermove", move, true);
+  document.addEventListener("pointerup", up, true);
+  document.addEventListener("pointercancel", up, true);
+  document.addEventListener("click", interceptClick, true);
+
+  updateInk();
+
+  return {
+    serialize() {
+      // Firebase Realtime Database가 지원하는 배열/숫자로 저장.
+      return strokes.map((s) => s.map((p) => [...p]));
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      finishStroke();
+      document.removeEventListener("pointerdown", down, true);
+      document.removeEventListener("pointermove", move, true);
+      document.removeEventListener("pointerup", up, true);
+      document.removeEventListener("pointercancel", up, true);
+      document.removeEventListener("click", interceptClick, true);
+    },
+  };
+}
 function openEditor(source, key) {
   if (batchMode || busy) return;
+
   const data = record(source, key);
   if (!data) return;
+
   editorItem = { source, key };
   lastSelectedRange = null;
-  const ui = dialogFrame(
-    source === "incoming" ? "사진에 기억 남기기" : "앨범의 기록 수정하기",
-    "사진을 누르면 크게 볼 수 있어요.",
-  );
-  const heading = makeField("제목", data.labelTxt || "");
-  heading.input.placeholder = "비워두면 사진 날짜가 제목이 돼요";
-  heading.input.maxLength = 80;
+
+  const layer = document.createElement("div");
+  layer.className = "overlay editor-overlay";
+
+  const box = document.createElement("section");
+  box.className = "dialog editor-modal";
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-modal", "true");
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "editor-close";
+  closeBtn.setAttribute("aria-label", "닫기");
+  closeBtn.textContent = "✕";
+
+  const shell = document.createElement("div");
+  shell.className = "editor-shell";
+
+  // -----------------------------
+  // LEFT : IMAGE FIRST
+  // -----------------------------
+  const left = document.createElement("div");
+  left.className = "editor-left";
+
+  const stage = document.createElement("div");
+  stage.className = "editor-image-stage";
+
+  const polaroid = document.createElement("button");
+  polaroid.type = "button";
+  polaroid.className = "editor-polaroid";
+  polaroid.setAttribute("aria-label", "사진 크게 보기");
+
+  const media = document.createElement("div");
+  media.className = "editor-polaroid-media";
+
   const img = new Image();
   img.src = data.image;
   img.alt = "메모 이미지";
-  img.className = "edit-image";
-  img.onclick = () => openPhotoViewer(data.image);
-  const label = document.createElement("div");
-  label.className = "field";
-  label.innerHTML = "<label>상세 메모</label>";
-  const editor = document.createElement("div");
-  editor.className = "rich-editor";
-  editor.contentEditable = "true";
-  editor.setAttribute("role", "textbox");
-  editor.setAttribute("aria-multiline", "true");
-  editor.dataset.placeholder = "오늘 있었던 일을 자유롭게 기록해 보세요.";
-  if (data.longMemoHtml && window.DOMPurify)
-    editor.innerHTML = cleanRich(data.longMemoHtml);
-  else {
-    // 이전 버전의 일반 텍스트도 줄 단위로 나누어 체크박스가 줄 앞에 붙게 함
-    const lines = String(data.longMemo || "").split(/\r?\n/);
-    for (const line of lines) {
-      const div = document.createElement("div");
-      if (line) div.textContent = line;
-      else div.append(document.createElement("br"));
-      editor.append(div);
-    }
+  img.decoding = "async";
+  media.append(img);
+
+  const dateInput = document.createElement("input");
+  dateInput.type = "date";
+  dateInput.className = "editor-polaroid-date";
+  dateInput.value = localDay(data.capturedAt ?? memoTime(data));
+
+  const titleInput = document.createElement("input");
+  titleInput.type = "text";
+  titleInput.className = "editor-polaroid-title";
+  titleInput.value = data.labelTxt || "";
+  titleInput.placeholder = "제목";
+  titleInput.maxLength = 80;
+
+  polaroid.append(media, dateInput, titleInput);
+  stage.append(polaroid);
+  left.append(stage);
+
+  // -----------------------------
+  // RIGHT : WRITING
+  // -----------------------------
+  const right = document.createElement("div");
+  right.className = "editor-right";
+
+  const topbar = document.createElement("div");
+  topbar.className = "editor-topbar";
+
+  const headingWrap = document.createElement("div");
+  headingWrap.className = "editor-heading-wrap";
+
+  const kicker = document.createElement("p");
+  kicker.className = "editor-kicker";
+  kicker.textContent = "MEMO";
+
+  const heading = document.createElement("h3");
+  heading.className = "editor-heading";
+  heading.textContent = "이 사진이 소중한 이유";
+
+  headingWrap.append(kicker, heading);
+
+  const actions = document.createElement("div");
+  actions.className = "editor-actions";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "editor-btn";
+  cancelBtn.textContent = "취소";
+
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.className = "editor-btn primary";
+  saveBtn.textContent = "앨범에 보관";
+
+  actions.append(cancelBtn, saveBtn);
+  topbar.append(headingWrap, actions);
+
+  const writingPanel = document.createElement("div");
+  writingPanel.className = "editor-writing-panel";
+
+  const memoPad = document.createElement("div");
+  memoPad.className = "editor-note-surface";
+  memoPad.contentEditable = "true";
+  memoPad.setAttribute("role", "textbox");
+  memoPad.setAttribute("aria-multiline", "true");
+  memoPad.spellcheck = true;
+  memoPad.dataset.placeholder = "이 날의 기억을 적어보세요.";
+
+  let initialText = "";
+  if (String(data.longMemo || "").trim()) {
+    initialText = String(data.longMemo);
+  } else if (data.longMemoHtml) {
+    const temp = document.createElement("div");
+    temp.innerHTML = cleanRich(data.longMemoHtml || "");
+    initialText = temp.innerText || "";
   }
-  editor
-    .querySelectorAll(".memo-task span")
-    .forEach((s) => (s.contentEditable = "true"));
-  editor.querySelectorAll(".memo-task input").forEach((input) => {
-    input.checked = input.hasAttribute("checked");
-  });
-  editor.addEventListener("keyup", () => {
-    const s = window.getSelection();
-    if (
-      s?.rangeCount &&
-      editor.contains(s.getRangeAt(0).commonAncestorContainer)
-    )
-      lastSelectedRange = s.getRangeAt(0).cloneRange();
-  });
-  editor.addEventListener("touchend", () =>
-    setTimeout(() => {
-      const s = window.getSelection();
-      if (
-        s?.rangeCount &&
-        editor.contains(s.getRangeAt(0).commonAncestorContainer)
-      )
-        lastSelectedRange = s.getRangeAt(0).cloneRange();
-    }, 20),
-  );
-  editor.addEventListener("paste", (e) => {
+
+  if (initialText.trim()) {
+    memoPad.textContent = initialText;
+  }
+
+  memoPad.addEventListener("paste", (e) => {
     e.preventDefault();
     const text = e.clipboardData?.getData("text/plain") || "";
     document.execCommand("insertText", false, text);
   });
-  const toolbar = editToolbar(editor);
-  const actions = document.createElement("div");
-  actions.className = "dialog-actions";
-  const dateBtn = document.createElement("button");
-  dateBtn.textContent = "날짜 변경";
-  const cancel = document.createElement("button");
-  cancel.textContent = "취소";
-  const save = document.createElement("button");
-  save.className = "solid";
-  save.textContent = source === "incoming" ? "보관함에 저장" : "변경사항 저장";
-  actions.append(dateBtn, cancel, save);
-  label.append(toolbar, editor);
-  ui.box.append(heading.field, img, label, actions);
+
+  writingPanel.append(memoPad);
+  right.append(topbar, writingPanel);
+
+  shell.append(left, right);
+  box.append(closeBtn, shell);
+  layer.append(box);
+  $("modal-root").append(layer);
+
+  const ink = setupEditorInk({
+    layer,
+    box,
+    polaroid,
+    data,
+  });
+
+  // -----------------------------
+  // tablet / mobile : 뒤 화면 같이 움직이는 거 방지
+  // -----------------------------
+  const blockBubble = (e) => e.stopPropagation();
+
+  [
+    box,
+    shell,
+    left,
+    right,
+    stage,
+    polaroid,
+    dateInput,
+    titleInput,
+    writingPanel,
+    memoPad,
+  ].forEach((node) => {
+    node.addEventListener("pointerdown", blockBubble);
+    node.addEventListener("pointermove", blockBubble);
+    node.addEventListener("pointerup", blockBubble);
+    node.addEventListener("touchstart", blockBubble, { passive: true });
+    node.addEventListener("touchmove", blockBubble, { passive: true });
+    node.addEventListener("wheel", blockBubble, { passive: true });
+  });
+
+  memoPad.addEventListener("focus", () => {
+    box.scrollIntoView({ block: "center", behavior: "smooth" });
+  });
+
+  polaroid.addEventListener("click", () => openPhotoViewer(data.image));
 
   function closeEditorWithoutSaving() {
-    // 저장 중에는 창을 닫지 않음
     if (busy) return;
 
-    ui.layer.remove();
+    ink.dispose();
+
+    layer.remove();
     editorItem = null;
 
-    // 인화실에서 분리한 사진이라면 줄로 복귀
     if (source === "incoming") {
       const hanger = darkroomPhysics.items.get(key);
-
-      if (hanger && hanger.detached && !hanger.deleting) {
+      if (hanger?.detached && !hanger.deleting) {
         returnDarkroomPhotoToWire(hanger);
       }
     }
   }
 
-  // X 버튼
-  ui.x.onclick = closeEditorWithoutSaving;
+  closeBtn.onclick = closeEditorWithoutSaving;
+  cancelBtn.onclick = closeEditorWithoutSaving;
 
-  // 취소 버튼
-  cancel.onclick = closeEditorWithoutSaving;
-
-  // 편집창 바깥의 어두운 배경 클릭
-  ui.layer.addEventListener("click", (event) => {
-    if (event.target === ui.layer) {
-      closeEditorWithoutSaving();
-    }
+  layer.addEventListener("click", (event) => {
+    if (event.target === layer) closeEditorWithoutSaving();
   });
-  dateBtn.onclick = async () => {
-    const picked = await chooseMissingPhotoDate();
-    if (picked === null) return;
-    try {
-      await db
-        .ref(pathFor(source))
-        .child(key)
-        .update({ capturedAt: picked, dateSource: "manual" });
-      data.capturedAt = picked;
-      toast("사진 날짜가 변경됐어요.");
-    } catch (e) {
-      toast("날짜 변경 실패: " + e.message);
-    }
-  };
-  save.onclick = async () => {
+
+  async function saveEditor() {
     if (busy) return;
+
     busy = true;
-    save.disabled = true;
-    save.textContent = "저장 중...";
+    saveBtn.disabled = true;
+    saveBtn.textContent = "저장 중...";
+
     try {
-      editor
-        .querySelectorAll('.memo-task input[type="checkbox"]')
-        .forEach((c) => c.toggleAttribute("checked", c.checked));
-      const content = editor.innerText || "";
-      const html = cleanRich(editor.innerHTML);
-      const title = heading.input.value.trim() || localDay(memoTime(data));
+      let capturedAt = data.capturedAt ?? memoTime(data);
+
+      if (dateInput.value) {
+        const base = new Date(capturedAt || Date.now());
+        const [yy, mm, dd] = dateInput.value.split("-").map(Number);
+
+        if (yy && mm && dd) {
+          capturedAt = new Date(
+            yy,
+            mm - 1,
+            dd,
+            base.getHours(),
+            base.getMinutes(),
+            base.getSeconds(),
+            0,
+          ).getTime();
+        }
+      }
+
+      const memoText = (memoPad.innerText || "")
+        .replace(/\u00A0/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+      const memoHtml = memoText
+        ? memoText
+            .split(/\n/)
+            .map((line) =>
+              line.trim()
+                ? `<div>${escapeHTML(line)}</div>`
+                : `<div><br></div>`,
+            )
+            .join("")
+        : "";
+
+      const title = titleInput.value.trim() || localDay(capturedAt);
+
       const updated = {
         image: data.image,
+        memoInk: ink.serialize(),
         labelTxt: title,
-        longMemo: content,
-        longMemoHtml: html,
-        capturedAt: data.capturedAt ?? memoTime(data),
+        longMemo: memoText,
+        longMemoHtml: memoHtml,
+        capturedAt,
         dateSource: data.dateSource || "manual",
         timestamp: data.timestamp || Date.now(),
       };
+
       if (source === "incoming") {
         updated.savedAt = Date.now();
+
         await db.ref("saved_memos").child(key).set(updated);
+
         try {
           await db.ref("incoming").child(key).remove();
         } catch (e) {
           console.warn("수신함 정리 실패", e);
           toast("저장은 됐지만 인화실 정리가 필요해요.");
         }
-      } else await db.ref("saved_memos").child(key).update(updated);
-      ui.layer.remove();
+      } else {
+        await db.ref("saved_memos").child(key).update(updated);
+      }
+
+      ink.dispose();
+      layer.remove();
       editorItem = null;
       toast("기록을 저장했어요.");
     } catch (e) {
@@ -2634,10 +2384,12 @@ function openEditor(source, key) {
       toast("저장 실패: " + e.message);
     } finally {
       busy = false;
-      save.disabled = false;
-      save.textContent = "저장";
+      saveBtn.disabled = false;
+      saveBtn.textContent = "앨범에 보관";
     }
-  };
+  }
+
+  saveBtn.onclick = saveEditor;
 }
 function openPhotoViewer(src) {
   $("viewer-image").src = src;
@@ -2873,19 +2625,12 @@ function init() {
     subscribe("incoming", incoming);
     subscribe("saved_memos", saved);
   }
-
   drawDarkroom();
   drawAlbums();
   drawCoverPolaroids();
-
-  // 하루에 한 번 메인 사진 변경
   scheduleDailyCoverRefresh();
-
-  // 브라우저를 오래 꺼뒀다가 다시 열어도 날짜 반영
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      drawCoverPolaroids();
-    }
+    if (!document.hidden) drawCoverPolaroids();
   });
 }
 if (document.readyState === "loading")
