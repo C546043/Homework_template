@@ -2289,6 +2289,476 @@
         text-overflow: ellipsis !important;
         text-align: left !important;
       }
+      /* CAPTURE TO MEMO — ARCHIVE LOOP BACKGROUND
+   Paste just before the LAST closing style tag in index.html.
+   Needs archive-ribbons.svg beside index.html.
+*/
+
+      /* No opaque white plate: translucent lavender-blue glass over the existing app. */
+      #archive-sheet {
+        background: linear-gradient(
+          130deg,
+          rgba(207, 220, 254, 0.83) 0%,
+          rgba(153, 181, 246, 0.6) 51%,
+          rgba(199, 213, 250, 0.81) 100%
+        ) !important;
+        -webkit-backdrop-filter: blur(36px) saturate(1.17);
+        backdrop-filter: blur(36px) saturate(1.17);
+        isolation: isolate;
+      }
+
+      /* Seamless transparent ribbon art. JS shifts background only 0.12px per 1px of album scroll. */
+      #archive-sheet::before {
+        content: "" !important;
+        position: absolute !important;
+        inset: 0 !important;
+        z-index: 0 !important;
+        pointer-events: none !important;
+        background-color: transparent !important;
+        background-image: url("./archive-ribbons.svg") !important;
+        background-repeat: repeat-x !important;
+        background-size: 1440px 100% !important;
+        background-position: var(--archive-ribbon-x, 0px) center !important;
+        filter: none !important;
+        opacity: 0.96;
+        will-change: background-position;
+      }
+
+      /* Subtle blue-light ambience behind the translucent albums. */
+      #archive-sheet::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse 65% 55% at 54% 40%,
+          rgba(255, 255, 255, 0.13),
+          transparent 75%
+        );
+      }
+      #archive-sheet > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* Remove the old top header and move its existing controls to a bottom glass dock. */
+      #archive-sheet .archive-header {
+        position: absolute !important;
+        z-index: 20 !important;
+        top: auto !important;
+        bottom: max(17px, env(safe-area-inset-bottom)) !important;
+        left: 50% !important;
+        width: min(810px, calc(100vw - 30px)) !important;
+        margin: 0 !important;
+        padding: 13px 17px !important;
+        transform: translateX(-50%) !important;
+        border: 1px solid rgba(255, 255, 255, 0.58) !important;
+        border-radius: 25px !important;
+        background: linear-gradient(
+          118deg,
+          rgba(237, 244, 255, 0.28),
+          rgba(220, 231, 255, 0.13)
+        ) !important;
+        box-shadow:
+          0 12px 40px rgba(45, 70, 127, 0.17),
+          inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+        -webkit-backdrop-filter: blur(28px) saturate(1.35) !important;
+        backdrop-filter: blur(28px) saturate(1.35) !important;
+      }
+      #archive-sheet .archive-brand,
+      #archive-sheet .archive-grip {
+        display: none !important;
+      }
+      #archive-sheet .archive-mini-bar {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 11px !important;
+      }
+      #archive-sheet .archive-tools {
+        order: 0 !important;
+        display: flex !important;
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        width: auto !important;
+        margin: 0 !important;
+        gap: 9px !important;
+        flex-wrap: nowrap !important;
+      }
+      #archive-sheet .archive-tools input {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: auto !important;
+        height: 44px !important;
+        padding: 0 14px !important;
+        border: 1px solid rgba(255, 255, 255, 0.65) !important;
+        border-radius: 13px !important;
+        background: rgba(242, 247, 255, 0.27) !important;
+        color: #354772 !important;
+        outline-color: #6b7eec;
+        font-size: 13px;
+      }
+      #archive-sheet #archive-search {
+        flex: 1.35 1 0 !important;
+      }
+      #archive-sheet #archive-date {
+        flex: 1 1 0 !important;
+      }
+      #archive-sheet .archive-tools button,
+      #archive-sheet .archive-close {
+        height: 44px !important;
+        padding: 0 15px !important;
+        border: 1px solid rgba(255, 255, 255, 0.62) !important;
+        border-radius: 13px !important;
+        background: rgba(236, 244, 255, 0.29) !important;
+        color: #4159a7 !important;
+        white-space: nowrap;
+        font-size: 13px;
+      }
+      #archive-sheet .archive-close {
+        order: 1;
+        flex: 0 0 auto;
+      }
+      #archive-sheet .archive-rail {
+        padding-top: 24px !important;
+        padding-bottom: 122px !important;
+        background: transparent !important;
+      }
+      /* Make the existing acrylic pages reveal some of the new background. */
+      #archive-sheet .album-page:first-child {
+        background: linear-gradient(
+          95deg,
+          rgba(249, 252, 255, 0.69),
+          rgba(218, 234, 255, 0.49)
+        ) !important;
+      }
+      #archive-sheet .album-page:nth-child(2) {
+        background: linear-gradient(
+          95deg,
+          rgba(220, 234, 255, 0.48),
+          rgba(249, 252, 255, 0.67)
+        ) !important;
+      }
+      /* Remove the three oval rings (keep the simple soft center fold). */
+      #archive-sheet .album-spread::after {
+        content: none !important;
+        display: none !important;
+      }
+      #archive-sheet .album-spread::before {
+        left: calc(50% - 5px) !important;
+        width: 10px !important;
+        background: linear-gradient(
+          90deg,
+          rgba(73, 101, 160, 0.15),
+          rgba(255, 255, 255, 0.58),
+          rgba(73, 101, 160, 0.12)
+        ) !important;
+        filter: blur(2px) !important;
+      }
+
+      @media (max-width: 670px) {
+        #archive-sheet .archive-header {
+          width: calc(100vw - 16px) !important;
+          bottom: max(8px, env(safe-area-inset-bottom)) !important;
+          padding: 10px !important;
+          border-radius: 18px !important;
+        }
+        #archive-sheet .archive-mini-bar {
+          gap: 6px !important;
+        }
+        #archive-sheet .archive-tools {
+          gap: 5px !important;
+        }
+        #archive-sheet .archive-tools input {
+          height: 38px !important;
+          padding: 0 7px !important;
+          font-size: 11px;
+        }
+        #archive-sheet .archive-tools button,
+        #archive-sheet .archive-close {
+          height: 38px !important;
+          padding: 0 7px !important;
+          font-size: 11px;
+        }
+        #archive-sheet .archive-rail {
+          padding-bottom: 95px !important;
+        }
+      }
+      /* CTM archive: lightweight white background + subtle floating decorations.
+   Place BEFORE the closing style tag; no JS animation is used here. */
+      #archive-sheet {
+        background: #f8faff !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        isolation: isolate;
+      }
+      #archive-sheet::before {
+        content: "" !important;
+        position: absolute !important;
+        inset: 0 !important;
+        z-index: 0 !important;
+        pointer-events: none !important;
+        background-color: transparent !important;
+        background-image: url("./archive-soft-decor.svg") !important;
+        background-repeat: repeat-x !important;
+        background-size: 1400px 100% !important;
+        background-position: 0 center !important;
+        filter: none !important;
+        opacity: 0.86 !important;
+        will-change: auto !important;
+        transform: none !important;
+      }
+      #archive-sheet::after {
+        content: none !important;
+        display: none !important;
+      }
+      #archive-sheet > * {
+        position: relative;
+        z-index: 1;
+      }
+      /* Keep pages translucent, but remove expensive per-album blurring. */
+      #archive-sheet .album-spread,
+      #archive-sheet .album-page {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+      #archive-sheet .album-page:first-child {
+        background: linear-gradient(
+          98deg,
+          rgba(255, 255, 255, 0.87),
+          rgba(237, 245, 255, 0.8)
+        ) !important;
+      }
+      #archive-sheet .album-page:nth-child(2) {
+        background: linear-gradient(
+          98deg,
+          rgba(238, 246, 255, 0.78),
+          rgba(255, 255, 255, 0.86)
+        ) !important;
+      }
+      /* Bottom-center mini control tray, not a large top toolbar. */
+      #archive-sheet .archive-header {
+        position: absolute !important;
+        z-index: 15 !important;
+        top: auto !important;
+        bottom: max(15px, env(safe-area-inset-bottom)) !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: min(570px, calc(100vw - 28px)) !important;
+        margin: 0 !important;
+        padding: 8px 10px !important;
+        border-radius: 19px !important;
+        border: 1px solid rgba(255, 255, 255, 0.85) !important;
+        background: rgba(231, 239, 253, 0.76) !important;
+        box-shadow:
+          0 9px 26px rgba(62, 82, 138, 0.12),
+          inset 0 1px 0 rgba(255, 255, 255, 0.88) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        backdrop-filter: blur(8px) !important;
+      }
+      #archive-sheet .archive-brand,
+      #archive-sheet .archive-grip {
+        display: none !important;
+      }
+      #archive-sheet .archive-mini-bar {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0 !important;
+      }
+      #archive-sheet .archive-tools {
+        display: flex !important;
+        flex: 1 1 auto !important;
+        align-items: center !important;
+        flex-wrap: nowrap !important;
+        justify-content: center !important;
+        min-width: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        gap: 7px !important;
+      }
+      #archive-sheet .archive-tools input {
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+        width: auto !important;
+        height: 34px !important;
+        padding: 0 9px !important;
+        border: 1px solid #dbe4f7 !important;
+        border-radius: 9px !important;
+        background: rgba(255, 255, 255, 0.73) !important;
+        font-size: 12px !important;
+        color: #425577 !important;
+      }
+      #archive-sheet #archive-search {
+        flex: 1 1 195px !important;
+      }
+      #archive-sheet #archive-date {
+        flex: 0 1 154px !important;
+      }
+      #archive-sheet .archive-tools button {
+        flex: 0 0 auto !important;
+        height: 34px !important;
+        padding: 0 10px !important;
+        border: 1px solid #dbe4f7 !important;
+        border-radius: 9px !important;
+        background: rgba(255, 255, 255, 0.74) !important;
+        color: #4b5fc3 !important;
+        font-size: 12px !important;
+        font-weight: 750 !important;
+      }
+      /* Top-centered reverse tab. The SAME existing archive-close button keeps its JS click handler. */
+      #archive-sheet > #archive-close {
+        position: absolute !important;
+        z-index: 20 !important;
+        top: 0 !important;
+        bottom: auto !important;
+        left: 50% !important;
+        right: auto !important;
+        transform: translateX(-50%) !important;
+        width: min(380px, 80vw) !important;
+        height: 57px !important;
+        padding: 13px 24px 9px !important;
+        border: 1px solid rgba(255, 255, 255, 0.94) !important;
+        border-top: 0 !important;
+        border-radius: 0 0 20px 20px !important;
+        background: linear-gradient(
+          125deg,
+          rgba(255, 255, 255, 0.93),
+          rgba(220, 230, 255, 0.87)
+        ) !important;
+        color: #565fe6 !important;
+        font-size: 15px !important;
+        font-weight: 900 !important;
+        letter-spacing: 0.045em !important;
+        white-space: nowrap !important;
+        box-shadow: 0 10px 30px rgba(43, 74, 146, 0.1) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        backdrop-filter: blur(8px) !important;
+        cursor: pointer !important;
+      }
+      #archive-sheet > #archive-close::before {
+        content: "";
+        position: absolute;
+        top: 6px;
+        left: 50%;
+        width: 42px;
+        height: 4px;
+        transform: translateX(-50%);
+        border-radius: 8px;
+        background: #a6b6ed;
+      }
+      /* Move album row slightly below center (existing horizontal scroll preserved). */
+      #archive-sheet #album-rail {
+        padding-top: clamp(92px, 12vh, 115px) !important;
+        padding-bottom: 72px !important;
+        background: transparent !important;
+        align-items: center !important;
+      }
+      /* Remove the three oval decorations from the center of every album. */
+      #archive-sheet .album-spread::after {
+        content: none !important;
+        display: none !important;
+      }
+      #archive-sheet .album-spread::before {
+        left: calc(50% - 5px) !important;
+        width: 10px !important;
+        background: linear-gradient(
+          90deg,
+          rgba(84, 111, 164, 0.11),
+          rgba(255, 255, 255, 0.58),
+          rgba(84, 111, 164, 0.11)
+        ) !important;
+        filter: blur(1px) !important;
+      }
+      @media (max-width: 670px) {
+        #archive-sheet .archive-header {
+          width: calc(100vw - 16px) !important;
+          bottom: max(8px, env(safe-area-inset-bottom)) !important;
+          padding: 6px !important;
+          border-radius: 13px !important;
+        }
+        #archive-sheet .archive-tools {
+          gap: 4px !important;
+        }
+        #archive-sheet .archive-tools input {
+          height: 32px !important;
+          padding: 0 6px !important;
+          font-size: 11px !important;
+        }
+        #archive-sheet #archive-search {
+          flex: 1 1 100px !important;
+        }
+        #archive-sheet #archive-date {
+          flex: 0 1 125px !important;
+        }
+        #archive-sheet .archive-tools button {
+          height: 32px !important;
+          padding: 0 7px !important;
+          font-size: 11px !important;
+        }
+        #archive-sheet > #archive-close {
+          height: 49px !important;
+          width: min(300px, 80vw) !important;
+          font-size: 12px !important;
+        }
+        #archive-sheet #album-rail {
+          padding-top: 70px !important;
+          padding-bottom: 78px !important;
+        }
+      }
+      /* ARCHIVE POLAROID — glossy blue pushpin + gravity swing
+   Add this ABOVE the closing style tag, after existing archive CSS.
+   One pin is drawn per photo. No extra image or dependency needed. */
+      #archive-sheet .album-photo {
+        /* the pin's center is at y=10px: rotate around that fixed point */
+        transform-origin: 50% 10px !important;
+        transform: rotate(
+          calc(var(--photo-angle, 0deg) + var(--swing-angle, 0deg))
+        ) !important;
+        transition:
+          filter 0.18s ease,
+          box-shadow 0.18s ease !important;
+      }
+
+      #archive-sheet .album-photo::before {
+        content: "" !important;
+        position: absolute;
+        left: 50%;
+        top: 2px;
+        width: 10px;
+        height: 10px;
+        transform: translateX(-50%);
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 30% 27%,
+          #ffffff 0%,
+          #e4fcff 12%,
+          #8be0ff 29%,
+          #4a9cf3 53%,
+          #2660b9 76%,
+          #183f8f 100%
+        );
+        box-shadow:
+          inset -1px -2px 3px rgba(10, 45, 118, 0.35),
+          inset 1px 1px 2px rgba(255, 255, 255, 0.9),
+          0 2px 4px rgba(29, 84, 160, 0.32),
+          0 0 7px rgba(115, 212, 255, 0.28);
+        z-index: 4;
+        pointer-events: none;
+      }
+
+      /* Only moving cards request GPU compositing: keep large archives light. */
+      #archive-sheet .album-photo.is-swinging {
+        will-change: transform;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #archive-sheet .album-photo {
+          --swing-angle: 0deg !important;
+        }
+      }
     </style>
     <!-- Three.js 모듈: glass3d.js와 동일한 버전 사용 -->
     <script type="importmap">
@@ -2387,6 +2857,10 @@
       ↑ &nbsp; OPEN THE ARCHIVE / 보관함
     </button>
     <section id="archive-sheet" aria-label="나의 사진 앨범" aria-hidden="true">
+      <button id="archive-close" class="archive-close" type="button">
+        ↓ BACK TO MAIN / 메인으로
+      </button>
+
       <header class="archive-header">
         <button
           id="archive-grip"
@@ -2406,9 +2880,6 @@
             <input type="date" id="archive-date" aria-label="날짜로 검색" />
             <button id="archive-reset" type="button">초기화</button>
           </div>
-          <button id="archive-close" class="archive-close" type="button">
-            ✕ 닫기
-          </button>
         </div>
       </header>
       <div id="album-rail" class="archive-rail"></div>

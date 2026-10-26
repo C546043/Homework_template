@@ -2889,6 +2889,151 @@ function setupViewportResize() {
   window.visualViewport?.addEventListener("resize", apply);
   window.addEventListener("resize", apply);
 }
+// Archive polaroids: one blue pin per card (drawn in CSS), lightweight pendulum.
+// Place this whole function BEFORE function init() in sketch.js.
+function setupArchivePhotoSwing() {
+  const rail = $("album-rail");
+  if (!rail || rail.dataset.swingSetup === "1") return;
+  rail.dataset.swingSetup = "1";
+
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const states = new WeakMap();
+  const visible = new Set();
+  const moving = new Set();
+  const observed = new Set();
+  let frame = 0;
+  let lastFrameTime = 0;
+  let previousScroll = rail.scrollLeft;
+
+  function run(now) {
+    frame = 0;
+    const dt = lastFrameTime
+      ? Math.min((now - lastFrameTime) / 1000, 0.035)
+      : 1 / 60;
+    lastFrameTime = now;
+    const archiveVisible = document.body.classList.contains("archive-open");
+
+    for (const photo of moving) {
+      const state = states.get(photo);
+      if (
+        !state ||
+        !photo.isConnected ||
+        !visible.has(photo) ||
+        !archiveVisible ||
+        reduced.matches
+      ) {
+        photo.classList.remove("is-swinging");
+        photo.style.removeProperty("--swing-angle");
+        moving.delete(photo);
+        continue;
+      }
+
+      // Damped pendulum: gravity/restoring force + drag (degrees, degrees/sec).
+      state.velocity += (-60 * state.angle - 7.2 * state.velocity) * dt;
+      state.angle += state.velocity * dt;
+      state.angle = Math.max(-12, Math.min(12, state.angle));
+      photo.style.setProperty("--swing-angle", state.angle.toFixed(2) + "deg");
+
+      if (Math.abs(state.angle) < 0.06 && Math.abs(state.velocity) < 0.35) {
+        state.angle = 0;
+        state.velocity = 0;
+        photo.style.setProperty("--swing-angle", "0deg");
+        photo.classList.remove("is-swinging");
+        moving.delete(photo);
+      }
+    }
+    if (moving.size) frame = requestAnimationFrame(run);
+    else lastFrameTime = 0;
+  }
+
+  function nudge(photo, velocity) {
+    if (
+      !visible.has(photo) ||
+      reduced.matches ||
+      !document.body.classList.contains("archive-open")
+    )
+      return;
+    const state = states.get(photo);
+    if (!state) return;
+    state.velocity = Math.max(-90, Math.min(90, state.velocity + velocity));
+    moving.add(photo);
+    photo.classList.add("is-swinging");
+    if (!frame) frame = requestAnimationFrame(run);
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        const photo = entry.target;
+        if (entry.isIntersecting) {
+          visible.add(photo);
+          // A small one-time swing when an album comes into view.
+          if (!states.get(photo).introduced) {
+            states.get(photo).introduced = true;
+            nudge(photo, 33);
+          }
+        } else {
+          visible.delete(photo);
+        }
+      }
+    },
+    { root: rail, rootMargin: "0px 65px", threshold: 0 },
+  );
+
+  function watchCards() {
+    // drawAlbums() may replace the whole rail: release old DOM references.
+    for (const photo of observed) {
+      if (photo.isConnected) continue;
+      observer.unobserve(photo);
+      observed.delete(photo);
+      visible.delete(photo);
+      moving.delete(photo);
+    }
+    for (const photo of rail.querySelectorAll(".album-photo")) {
+      if (observed.has(photo)) continue;
+      observed.add(photo);
+      states.set(photo, { angle: 0, velocity: 0, introduced: false });
+      observer.observe(photo);
+    }
+  }
+
+  // The existing drawAlbums() rebuilds cards after Firebase/search updates.
+  new MutationObserver(watchCards).observe(rail, { childList: true });
+  watchCards();
+
+  // Scrolling moves the album; inertia makes the photos sway the other way.
+  rail.addEventListener(
+    "scroll",
+    () => {
+      const delta = rail.scrollLeft - previousScroll;
+      previousScroll = rail.scrollLeft;
+      if (Math.abs(delta) < 0.4) return;
+      const push = Math.max(-65, Math.min(65, -delta * 1.8));
+      for (const photo of visible) nudge(photo, push);
+    },
+    { passive: true },
+  );
+
+  // A tap or hold causes a tiny wiggle but does not block normal photo editing.
+  rail.addEventListener(
+    "pointerdown",
+    (event) => {
+      const photo =
+        event.target instanceof Element
+          ? event.target.closest(".album-photo")
+          : null;
+      if (photo)
+        nudge(
+          photo,
+          event.clientX <
+            photo.getBoundingClientRect().left + photo.clientWidth / 2
+            ? -48
+            : 48,
+        );
+    },
+    { passive: true },
+  );
+}
 function init() {
   // 예전 좌우 이동 버튼을 제거했더라도 오류가 나지 않게 함
   $("archive-tab").onclick = () => setArchive(true);
@@ -2921,6 +3066,7 @@ function init() {
   });
   setupSwipes();
   setupArchiveRailDrag();
+  setupArchivePhotoSwing();
   setupViewportResize();
   if (!db || typeof db.ref !== "function") {
     toast(
