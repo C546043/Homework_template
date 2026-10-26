@@ -372,10 +372,18 @@ function setupSwipes() {
         return;
       }
       const touch = event.touches[0];
+
       verticalStart = {
         x: touch.clientX,
         y: touch.clientY,
         target: event.target,
+        startedAt: performance.now(),
+
+        // 앨범 페이지를 읽기 위해 스크롤 중인지 기록
+        pageScrollTop:
+          event.target instanceof Element
+            ? event.target.closest(".album-page")?.scrollTop || 0
+            : 0,
       };
     },
     { capture: true, passive: true },
@@ -391,9 +399,31 @@ function setupSwipes() {
       const dx = touch.clientX - start.x;
       const dy = touch.clientY - start.y;
       if (Math.abs(dy) < 65 || Math.abs(dy) < Math.abs(dx) * 1.3) return;
+
       if (archiveOpen) {
-        if (dy > 0 && start.target.closest?.("#archive-grip,.archive-header")) {
+        const elapsed = performance.now() - start.startedAt;
+
+        const startedInArchive =
+          start.target instanceof Element &&
+          !!start.target.closest("#archive-sheet");
+
+        const onInput =
+          start.target instanceof Element &&
+          !!start.target.closest("input,textarea,select,[contenteditable]");
+
+        // 보관함에서 아래로 빠르게 스와이프
+        if (
+          startedInArchive &&
+          !onInput &&
+          !batchMode &&
+          !busy &&
+          dy > 105 &&
+          elapsed < 550 &&
+          dy > Math.abs(dx) * 1.3 &&
+          start.pageScrollTop < 3
+        ) {
           setArchive(false);
+          goRoom("cover");
         }
       } else if (dy < 0 && start.y > window.innerHeight * 0.62) {
         setArchive(true);
@@ -1238,7 +1268,7 @@ function createAlbumPhoto(row) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "album-photo";
-  btn.dataset.date = clockTime(row.t);
+  btn.dataset.title = String(row.data.labelTxt || "").trim() || "제목 없음";
   btn.title = row.data.labelTxt || row.day;
 
   // 사진마다 일정하지만 서로 다른 기울기

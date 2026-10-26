@@ -2251,6 +2251,44 @@
           height: 82px;
         }
       }
+
+      /* 지우개를 펜 아래로 이동하고 크기 축소 */
+      .editor-modal .editor-eraser-toggle {
+        left: calc(40% + 18px) !important;
+        top: 60px !important;
+        width: 42px !important;
+        height: 62px !important;
+        padding: 2px !important;
+        transform: rotate(-13deg) !important;
+      }
+
+      .editor-modal .editor-eraser-toggle img {
+        height: 54px !important;
+        width: auto !important;
+        max-width: 100% !important;
+      }
+
+      .editor-modal .editor-eraser-toggle.is-active {
+        transform: rotate(-7deg) translateY(-2px) !important;
+      }
+
+      /* 보관함 폴라로이드: 기존 2열을 3열로 */
+      .album-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: clamp(8px, 1vw, 14px) !important;
+      }
+
+      /* 날짜 대신 제목 표시 */
+      .album-photo::after {
+        content: attr(data-title) !important;
+        left: 6px !important;
+        right: 6px !important;
+        width: auto !important;
+        overflow: hidden !important;
+        white-space: nowrap !important;
+        text-overflow: ellipsis !important;
+        text-align: left !important;
+      }
     </style>
     <!-- Three.js 모듈: glass3d.js와 동일한 버전 사용 -->
     <script type="importmap">
