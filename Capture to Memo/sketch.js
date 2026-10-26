@@ -423,7 +423,6 @@ function setupSwipes() {
           start.pageScrollTop < 3
         ) {
           setArchive(false);
-          goRoom("cover");
         }
       } else if (dy < 0 && start.y > window.innerHeight * 0.62) {
         setArchive(true);
@@ -1289,15 +1288,22 @@ function createAlbumPhoto(row) {
   installPhotoInteraction(btn, "locker", row.key);
   return btn;
 }
-function createPage(day, rows) {
+
+function createPage(pageDays, rows) {
   const page = document.createElement("div");
   page.className = "album-page";
+
+  const dates = Array.isArray(pageDays) ? pageDays : [pageDays].filter(Boolean);
+
   const heading = document.createElement("p");
   heading.className = "page-date";
-  heading.textContent = day
-    ? `${relativeDay(day)}  ·  ${rows.length} PHOTOS`
+
+  heading.textContent = dates.length
+    ? `${dates.map(relativeDay).join(" · ")}  /  ${rows.length} PHOTOS`
     : "BLANK PAGE";
+
   page.append(heading);
+
   if (!rows.length) {
     const empty = document.createElement("p");
     empty.className = "page-empty";
@@ -1305,18 +1311,27 @@ function createPage(day, rows) {
     page.append(empty);
     return page;
   }
+
   const grid = document.createElement("div");
   grid.className = "album-grid";
-  rows.forEach((r) => grid.appendChild(createAlbumPhoto(r)));
+
+  rows.forEach((row) => {
+    grid.appendChild(createAlbumPhoto(row));
+  });
+
   page.appendChild(grid);
   return page;
 }
+
 function drawAlbums() {
   const rail = $("album-rail");
+  if (!rail) return;
+
   const previousScroll = rail.scrollLeft;
   rail.replaceChildren();
 
   const rows = filteredSaved();
+
   if (!rows.length) {
     const empty = document.createElement("div");
     empty.className = "archive-empty";
@@ -1326,13 +1341,55 @@ function drawAlbums() {
     return;
   }
 
+  // 1. 날짜별 사진 분류
   const days = new Map();
-  rows.forEach((row) => {
-    if (!days.has(row.day)) days.set(row.day, []);
+
+  for (const row of rows) {
+    if (!days.has(row.day)) {
+      days.set(row.day, []);
+    }
     days.get(row.day).push(row);
-  });
+  }
 
   const dates = [...days.keys()].sort().reverse();
+
+  // 2. 사진 1~2장인 날은 최대 3일 묶기
+  const pages = [];
+  let group = [];
+
+  const flushGroup = () => {
+    if (!group.length) return;
+
+    pages.push({
+      dates: [...group],
+      photos: group.flatMap((day) => days.get(day)),
+    });
+
+    group = [];
+  };
+
+  for (const day of dates) {
+    if (days.get(day).length >= 3) {
+      // 하루 3장 이상이면 독립된 페이지
+      flushGroup();
+
+      pages.push({
+        dates: [day],
+        photos: days.get(day),
+      });
+    } else {
+      // 하루 1~2장이면 함께 묶기
+      group.push(day);
+
+      if (group.length === 3) {
+        flushGroup();
+      }
+    }
+  }
+
+  flushGroup();
+
+  // 3. 한 권에 두 페이지
   const covers = [
     { color: "#b9ccef", ink: "#20345d", dark: false },
     { color: "#e2c8b0", ink: "#4d392c", dark: false },
@@ -1341,82 +1398,60 @@ function drawAlbums() {
     { color: "#e5b8bf", ink: "#5f3545", dark: false },
     { color: "#c5badc", ink: "#473962", dark: false },
   ];
+
   const rotations = [-4.2, 3.3, -2.4, 4.5, -3.5, 2.1];
 
-  for (let i = 0; i < dates.length; i += 2) {
-    const albumIndex = Math.floor(i / 2);
-    const firstDay = dates[i];
-    const secondDay = dates[i + 1];
-    const albumKey = `${firstDay}|${secondDay || ""}`;
+  for (let i = 0; i < pages.length; i += 2) {
+    const albumIndex = i / 2;
+
+    const first = pages[i];
+    const second = pages[i + 1] || {
+      dates: [],
+      photos: [],
+    };
+
+    const allDates = [...first.dates, ...second.dates];
+    const newest = allDates[0];
+    const oldest = allDates[allDates.length - 1];
+
     const style = covers[albumIndex % covers.length];
 
     const card = document.createElement("article");
     card.className = "album-card";
-    card.dataset.album = albumKey;
+
+    card.dataset.album = `${newest}|${oldest}`;
     card.dataset.dark = String(style.dark);
+
     card.style.setProperty("--album-color", style.color);
     card.style.setProperty("--album-ink", style.ink);
+
     card.style.setProperty(
       "--album-angle",
       `${rotations[albumIndex % rotations.length]}deg`,
     );
-    if (albumClosed.has(albumKey)) card.classList.add("closed");
 
     const spread = document.createElement("div");
     spread.className = "album-spread";
-    spread.append(
-      createPage(firstDay, days.get(firstDay)),
-      createPage(secondDay, secondDay ? days.get(secondDay) : []),
-    );
 
-    const cover = document.createElement("div");
-    cover.className = "album-cover";
-    cover.innerHTML = `
-      <span class="album-cover-mini">CAPTURE TO MEMO · VOL.${String(albumIndex + 1).padStart(2, "0")}</span>
-      <div class="album-cover-name">Our<br>Days.</div>
-      <span class="album-cover-period">${escapeHTML(secondDay || firstDay)} — ${escapeHTML(firstDay)}</span>
-    `;
+    spread.append(
+      createPage(first.dates, first.photos),
+      createPage(second.dates, second.photos),
+    );
 
     const caption = document.createElement("div");
     caption.className = "album-caption";
+
     const info = document.createElement("span");
-    info.textContent = `ALBUM ${String(albumIndex + 1).padStart(2, "0")}  /  ${secondDay || firstDay} — ${firstDay}`;
+    info.textContent = `ALBUM ${String(albumIndex + 1).padStart(2, "0")} / ${oldest} — ${newest}`;
+
     caption.append(info);
 
-    card.append(spread, cover, caption);
-    // 한 번 탭하면 책 열기/닫기, 드래그면 가로 스크롤만 수행.
-    let press = null;
-    let justDragged = false;
-    card.addEventListener("pointerdown", (event) => {
-      press = { id: event.pointerId, x: event.clientX, y: event.clientY };
-      justDragged = false;
-    });
-    card.addEventListener("pointermove", (event) => {
-      if (!press || event.pointerId !== press.id) return;
-      if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > 9) {
-        justDragged = true;
-      }
-    });
-    card.addEventListener("pointercancel", () => {
-      press = null;
-    });
-    card.addEventListener("pointerup", () => {
-      press = null;
-    });
-    card.addEventListener("click", (event) => {
-      if (justDragged || performance.now() < archiveDragSuppressUntil) {
-        justDragged = false;
-        event.preventDefault();
-        return;
-      }
-      if (batchMode || event.target.closest("button,input")) return;
-      if (albumClosed.has(albumKey)) albumClosed.delete(albumKey);
-      else albumClosed.add(albumKey);
-      card.classList.toggle("closed", albumClosed.has(albumKey));
-    });
+    // 책 닫기 이벤트와 닫힌 표지는 만들지 않음
+    card.append(spread, caption);
     rail.append(card);
   }
 
+  // 사진 저장 후 다시 그려도 현재 앨범 스크롤 유지
   rail.scrollLeft = previousScroll;
 }
 
