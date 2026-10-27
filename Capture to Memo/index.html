@@ -10,9 +10,9 @@
     <title>Capture to Memo — Acrylic Album</title>
     <style>
       /* ============================================================
-   CAPTURE TO MEMO  /  ACRYLIC ALBUM EDITION
-   A single, consolidated stylesheet. No pins; no old overrides.
-   ============================================================ */
+         CAPTURE TO MEMO  /  ACRYLIC ALBUM EDITION
+         A single, consolidated stylesheet. No pins; no old overrides.
+         ============================================================ */
       :root {
         --ink: #192444;
         --muted: #74819e;
@@ -66,8 +66,8 @@
         letter-spacing: 0.18em;
       }
       /* ------------------------------------------------------------
-   01. CONTINUOUS COVER + DARKROOM WORLD
-   ------------------------------------------------------------ */
+         01. CONTINUOUS COVER + DARKROOM WORLD
+         ------------------------------------------------------------ */
       #world {
         position: relative;
         z-index: 0;
@@ -327,9 +327,9 @@
         }
       }
       /* ------------------------------------------------------------
-   //THE PRINT ROOM — TWO CROSSING WIRES + PHYSICS POLAROIDS
-   //앞줄: Firebase 실제 사진 | 뒷줄: 흐린 빈 폴라로이드
-   ------------------------------------------------------------ */
+         //THE PRINT ROOM — TWO CROSSING WIRES + PHYSICS POLAROIDS
+         //앞줄: Firebase 실제 사진 | 뒷줄: 흐린 빈 폴라로이드
+         ------------------------------------------------------------ */
       #world-wire-overlay {
         position: absolute;
         inset: 0;
@@ -570,8 +570,8 @@
         visibility: hidden;
       }
       /* ------------------------------------------------------------
-   02. THE ARCHIVE — SOLID PAGE, TRANSLUCENT ALBUMS
-   ------------------------------------------------------------ */
+         02. THE ARCHIVE — SOLID PAGE, TRANSLUCENT ALBUMS
+         ------------------------------------------------------------ */
       #archive-sheet {
         position: fixed;
         inset: 0;
@@ -1029,8 +1029,8 @@
         display: flex;
       }
       /* ------------------------------------------------------------
-   03. EDIT DIALOG, REAL PHOTO (UNCROPPED), TEXT FORMATTING
-   ------------------------------------------------------------ */
+         03. EDIT DIALOG, REAL PHOTO (UNCROPPED), TEXT FORMATTING
+         ------------------------------------------------------------ */
       .overlay {
         position: fixed;
         inset: 0;
@@ -1260,8 +1260,8 @@
         z-index: 3;
       }
       /* =========================================================
-   GLASS EDITOR — IMAGE FIRST UI (REFINED)
-   ========================================================= */
+         GLASS EDITOR — IMAGE FIRST UI (REFINED)
+         ========================================================= */
       .editor-overlay {
         align-items: center;
         justify-content: center;
@@ -1602,8 +1602,8 @@
         }
       }
       /* ------------------------------------------------------------
-   04. BULK SELECTION
-   ------------------------------------------------------------ */
+         04. BULK SELECTION
+         ------------------------------------------------------------ */
       #batch-bar {
         position: fixed;
         left: 50%;
@@ -1672,8 +1672,8 @@
         display: block;
       }
       /* ------------------------------------------------------------
-   05. RESPONSIVE + REDUCED MOTION
-   ------------------------------------------------------------ */
+         05. RESPONSIVE + REDUCED MOTION
+         ------------------------------------------------------------ */
       @media (max-width: 1020px) {
         #cover-title {
           left: 5.5%;
@@ -1880,7 +1880,7 @@
       }
       #memo-drop-zone {
         position: absolute;
-        left: 50%;
+        left: calc(50% - 100px);
         bottom: -38px;
         width: min(800px, 90vw);
         height: clamp(250px, 36vh, 355px);
@@ -2014,9 +2014,9 @@
         }
       }
       /* ========================================================
-   PEN PATCH — index.html 스타일 마지막 부분에 추가
-   기존 편집기 스타일은 삭제하지 않음
-   ======================================================== */
+         PEN PATCH — index.html 스타일 마지막 부분에 추가
+         기존 편집기 스타일은 삭제하지 않음
+         ======================================================== */
 
       /* 현재 크기에서 폴라로이드를 약 1.3배 키우고 왼쪽으로 확장 */
       .editor-modal .editor-polaroid {
@@ -2105,8 +2105,8 @@
       }
 
       /* ==================================
-   PEN SIZE + POLAROID SIZE FIX
-================================== */
+         PEN SIZE + POLAROID SIZE FIX
+      ================================== */
 
       /* 폴라로이드: 펜 추가 전 크기로 복귀 */
       .editor-modal .editor-polaroid {
@@ -2290,9 +2290,9 @@
         text-align: left !important;
       }
       /* CAPTURE TO MEMO — ARCHIVE LOOP BACKGROUND
-   Paste just before the LAST closing style tag in index.html.
-   Needs archive-ribbons.svg beside index.html.
-*/
+         Paste just before the LAST closing style tag in index.html.
+         Needs archive-ribbons.svg beside index.html.
+      */
 
       /* No opaque white plate: translucent lavender-blue glass over the existing app. */
       #archive-sheet {
@@ -2486,7 +2486,7 @@
         }
       }
       /* CTM archive: lightweight white background + subtle floating decorations.
-   Place BEFORE the closing style tag; no JS animation is used here. */
+         Place BEFORE the closing style tag; no JS animation is used here. */
       #archive-sheet {
         background: #f8faff !important;
         backdrop-filter: none !important;
@@ -2709,8 +2709,8 @@
         }
       }
       /* ARCHIVE POLAROID — glossy blue pushpin + gravity swing
-   Add this ABOVE the closing style tag, after existing archive CSS.
-   One pin is drawn per photo. No extra image or dependency needed. */
+         Add this ABOVE the closing style tag, after existing archive CSS.
+         One pin is drawn per photo. No extra image or dependency needed. */
       #archive-sheet .album-photo {
         /* the pin's center is at y=10px: rotate around that fixed point */
         transform-origin: 50% 10px !important;
@@ -2757,6 +2757,80 @@
       @media (prefers-reduced-motion: reduce) {
         #archive-sheet .album-photo {
           --swing-angle: 0deg !important;
+        }
+      }
+
+      /* 인화실 책 위 안내 문구 */
+      #memo-drop-zone .memo-drop-hint {
+        position: absolute;
+        top: clamp(24px, 6vh, 56px);
+        bottom: auto !important;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 5;
+
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+
+        width: max-content;
+        max-width: 90vw;
+        text-align: center;
+        white-space: normal;
+
+        pointer-events: none;
+      }
+
+      #memo-drop-zone .book-guide-eng {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        color: #989fce;
+      }
+
+      /* 메인 안내 문구 */
+      #memo-drop-zone .book-guide-title {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 600;
+        color: #7985a7;
+      }
+
+      #memo-drop-zone .memo-drop-hint {
+        position: absolute;
+        top: -350px;
+        bottom: auto;
+        left: calc(50% + -10px);
+        transform: translateX(-50%);
+
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0px;
+
+        width: max-content;
+        max-width: 90%;
+        text-align: center;
+        pointer-events: none;
+        z-index: 5;
+      }
+
+      /* 모바일 */
+      @media (max-width: 660px) {
+        #memo-drop-zone .memo-drop-hint {
+          top: 12px;
+          width: 90vw;
+        }
+
+        #memo-drop-zone .book-guide-title {
+          font-size: 12px;
+        }
+        #memo-drop-zone .book-guide-desc {
+          margin: 0;
+          font-size: 10px;
+          font-weight: 400;
+          color: #a6aec3;
         }
       }
     </style>
@@ -2828,7 +2902,14 @@
           <div id="memo-drop-zone" aria-label="사진을 놓아 메모를 작성하는 책">
             <div id="memo-book-desk" aria-hidden="true"></div>
             <div id="memo-book-3d" aria-hidden="true"></div>
-            <span class="memo-drop-hint">사진을 책 위에 놓아주세요</span>
+
+            <div class="memo-drop-hint">
+              <span class="book-guide-eng">DRAG TO SAVE</span>
+              <p class="book-guide-title">사진을 책 위에 끌어 놓아보세요.</p>
+              <p class="book-guide-desc">
+                메모를 작성하고 앨범에 보관할 수 있어요.
+              </p>
+            </div>
           </div>
           <div id="shred-zone" aria-label="가위 사진 파기 구역">
             <div class="shred-zone-content" aria-hidden="true">
