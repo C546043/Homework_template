@@ -1,0 +1,26 @@
+
+/* Archive multi-select: touch dragging, top actions, bottom deletion */
+/* 평소에는 손가락으로 앨범을 좌우 스크롤할 수 있고, 길게 누른 뒤에는 아래로 끌 수 있음. */
+#archive-sheet .album-photo {
+  touch-action: pan-x;
+  -webkit-user-select: none;
+  user-select: none;
+}
+body.batch-mode #archive-sheet .album-photo {
+  touch-action: none !important;
+  -webkit-user-select: none;
+  user-select: none;
+}
+body.batch-mode #archive-sheet .album-photo.is-drag-source {
+  opacity: .30 !important;
+}
+body.batch-mode #archive-close,
+body.batch-mode #archive-sheet .archive-header {
+  display: none !important;
+}
+body.batch-mode #batch-bar {
+  display: flex;
+}
+body.batch-mode #archive-trash-zone {
+  display: block;
+}

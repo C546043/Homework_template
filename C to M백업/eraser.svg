@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="_레이어_2" data-name="레이어 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80.66 131.08">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #3a4092;
+      }
+
+      .cls-2 {
+        fill: #575ce4;
+      }
+
+      .cls-3 {
+        fill: #c0cbe7;
+      }
+
+      .cls-4 {
+        fill: #9c9cd3;
+      }
+
+      .cls-5 {
+        fill: #fefeff;
+      }
+    </style>
+  </defs>
+  <g id="_레이어_1-2" data-name="레이어 1">
+    <g>
+      <rect class="cls-4" x="46.91" y="0" width="20.11" height="10.26"/>
+      <rect class="cls-4" x="23.19" y="119.92" width="49.62" height="11.16"/>
+      <rect class="cls-2" y="35.21" width="63.18" height="84.71"/>
+      <rect class="cls-1" x="63.18" y="35.21" width="17.48" height="84.71"/>
+      <path class="cls-5" d="M0,119.92h63.18v5.13c0,3.32-2.7,6.02-6.02,6.02H6.02c-3.32,0-6.02-2.7-6.02-6.02v-5.13h0Z"/>
+      <path class="cls-5" d="M13.39,0h40.65c5.05,0,9.14,4.1,9.14,9.14v26.07H0V13.39C0,6,6,0,13.39,0Z"/>
+      <path class="cls-3" d="M66.63,0h1.77C75.16,0,80.66,5.5,80.66,12.27v22.94h-17.48V3.45C63.18,1.55,64.72,0,66.63,0Z"/>
+      <path class="cls-3" d="M63.18,119.92h17.48v4.35c0,3.76-3.05,6.81-6.81,6.81h-3.87c-3.76,0-6.81-3.05-6.81-6.81v-4.35h0Z"/>
+      <rect class="cls-5" y="40.26" width="63.18" height="4.29"/>
+      <rect class="cls-3" x="63.18" y="40.26" width="17.48" height="4.29"/>
+    </g>
+  </g>
+</svg>

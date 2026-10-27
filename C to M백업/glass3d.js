@@ -199,80 +199,40 @@ if (mount && cover) {
     heroBook.scale.setScalar(1.8);
     stage.add(heroBook);
 
-    /* ==========================================
-   메인 책을 복제한 인화실용 3D 메모 책
-========================================== */
-
+    // Independent 3D drop-book; attached to the darkroom's local coordinates.
     function setupMemoDropBook() {
-      const dropZone = document.getElementById("memo-drop-zone");
-      const bookHost = document.getElementById("memo-book-3d");
-      if (!dropZone || !bookHost) return;
-
+      const zone = document.getElementById("memo-drop-zone");
+      const host = document.getElementById("memo-book-3d");
+      if (!zone || !host) return;
       try {
         const bookScene = new THREE.Scene();
         bookScene.environment = scene.environment;
         bookScene.add(new THREE.AmbientLight(0xffffff, 1.45));
-
         const light = new THREE.DirectionalLight(0xffffff, 2.1);
         light.position.set(-3, 8, 6);
         bookScene.add(light);
-
-        const fill = new THREE.DirectionalLight(0xcfe0ff, 1.0);
+        const fill = new THREE.DirectionalLight(0xcfe0ff, 1);
         fill.position.set(4, 5, -3);
         bookScene.add(fill);
-
-        // 메인 책을 복제하므로 메인 화면은 변경되지 않음
-        const memoBook = heroBook.clone(true);
-        bookScene.add(memoBook);
-
-        const spine = memoBook.children[0];
-        const back = memoBook.children[1];
-        const leaves = memoBook.children.slice(2, 8);
-        const front = memoBook.children[8];
-
-        if (!spine || !back || !front || leaves.length !== 6) {
-          console.error("메모 책 파츠가 예상한 구조와 다릅니다.");
-          return;
-        }
-
-        // =====================================
-        // 1. 책 크기, 위치, 회전
-        // =====================================
-
+        const lowerBook = heroBook.clone(true);
+        bookScene.add(lowerBook);
+        const spine = lowerBook.children[0];
+        const back = lowerBook.children[1];
+        const leaves = lowerBook.children.slice(2, 8);
+        const front = lowerBook.children[8];
+        if (!spine || !back || leaves.length !== 6 || !front)
+          throw new Error("책 파츠 구조 오류");
         const BOOK_SCALE = 1.12;
-
-        memoBook.scale.setScalar(BOOK_SCALE);
-
+        lowerBook.scale.setScalar(BOOK_SCALE);
         const BASE_Y = -0.42;
-        memoBook.position.set(0.92, BASE_Y, -0.05);
-
-        // 사용자가 직접 정한 회전값 유지!
-        memoBook.rotation.set(-2.5, 0, 0);
-
-        // =====================================
-        // 2. 파란 책등 수정
-        // =====================================
-
-        // 실제 페이지가 회전하는 축으로 이동
-        spine.position.set(back.position.x, 0, -0.15);
-
-        // 표지보다 짧고 얇게
-        spine.scale.set(0.58, 0.94, 0.55);
-
-        // =====================================
-        // 3. 표지 위치
-        // =====================================
-
+        lowerBook.position.set(0.92, BASE_Y, -0.05);
+        // User-approved resting angle; do not modify.
+        lowerBook.rotation.set(-2.5, 0, 0);
+        const hingeX = back.position.x;
+        spine.position.set(hingeX - 0.04, 0, -0.22);
+        spine.scale.set(0.58, 0.91, 0.55);
         back.position.z = -0.25;
         front.position.z = -0.24;
-
-        back.rotation.set(0, -0.1, 0);
-        front.rotation.set(0, -Math.PI + 0.1, 0);
-
-        // =====================================
-        // 4. 평상시에도 살짝 접힌 속지
-        // =====================================
-
         const restAngles = [
           -0.3,
           -0.25,
@@ -281,153 +241,109 @@ if (mount && cover) {
           -Math.PI + 0.25,
           -Math.PI + 0.3,
         ];
+        leaves.forEach((leaf, i) => leaf.rotation.set(0, restAngles[i], 0));
+        back.rotation.set(0, -0.1, 0);
+        front.rotation.set(0, -Math.PI + 0.1, 0);
 
-        leaves.forEach((leaf, i) => {
-          leaf.rotation.set(0, restAngles[i], 0);
+        // Overlapping page flips: start every 0.5 s, each lasts the previous 0.84 s.
+        const flips = Array.from({ length: 3 }, (_, i) => {
+          const obj = leaves[4].clone(true); // LEFT-side page is at about -PI.
+          obj.visible = false;
+          obj.position.copy(leaves[4].position);
+          obj.position.z += 0.03 + i * 0.007;
+          lowerBook.add(obj);
+          return { obj, start: -Infinity };
         });
-
-        // =====================================
-        // 5. 반복해서 넘어갈 페이지 한 장 복제
-        // =====================================
-
-        const turningPage = leaves[1].clone(true);
-
-        turningPage.position.copy(leaves[1].position);
-        turningPage.position.z = 0.095;
-        turningPage.rotation.set(0, restAngles[1], 0);
-        turningPage.visible = false;
-
-        memoBook.add(turningPage);
-
-        // =====================================
-        // 6. 카메라와 렌더러
-        // =====================================
-
-        const bookCamera = new THREE.OrthographicCamera(-4, 4, 2, -2, 0.1, 60);
-
-        bookCamera.position.set(0, 10.5, 6.2);
-        bookCamera.lookAt(0, -0.5, 0);
-
-        const bookRenderer = new THREE.WebGLRenderer({
+        const camera2 = new THREE.OrthographicCamera(-4, 4, 2, -2, 0.1, 60);
+        camera2.position.set(0, 10.5, 6.2);
+        camera2.lookAt(0, -0.5, 0);
+        const renderer2 = new THREE.WebGLRenderer({
           alpha: true,
           antialias: true,
           powerPreference: "low-power",
         });
-
-        bookRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-
-        bookRenderer.setClearColor(0xffffff, 0);
-        bookRenderer.outputColorSpace = THREE.SRGBColorSpace;
-        bookRenderer.toneMapping = THREE.ACESFilmicToneMapping;
-        bookRenderer.toneMappingExposure = 0.95;
-
-        bookHost.replaceChildren(bookRenderer.domElement);
-
-        function sizeBook() {
-          const width = Math.max(1, bookHost.clientWidth);
-          const height = Math.max(1, bookHost.clientHeight);
+        renderer2.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+        renderer2.setClearColor(0xffffff, 0);
+        renderer2.outputColorSpace = THREE.SRGBColorSpace;
+        renderer2.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer2.toneMappingExposure = 0.95;
+        host.replaceChildren(renderer2.domElement);
+        function resizeBook() {
+          const width = Math.max(1, host.clientWidth),
+            height = Math.max(1, host.clientHeight);
           const aspect = width / height;
-
           const halfWidth = Math.max(4.2, 1.95 * aspect);
-          const halfHeight = halfWidth / aspect;
-
-          bookCamera.left = -halfWidth;
-          bookCamera.right = halfWidth;
-          bookCamera.top = halfHeight;
-          bookCamera.bottom = -halfHeight;
-
-          bookCamera.updateProjectionMatrix();
-          bookRenderer.setSize(width, height, false);
+          camera2.left = -halfWidth;
+          camera2.right = halfWidth;
+          camera2.top = halfWidth / aspect;
+          camera2.bottom = -halfWidth / aspect;
+          camera2.updateProjectionMatrix();
+          renderer2.setSize(width, height, false);
         }
-
-        sizeBook();
-        window.addEventListener("resize", sizeBook);
-
-        // =====================================
-        // 7. 책 접힘 + 페이지 반복 애니메이션
-        // =====================================
-
-        let fold = 0;
-        let turnClock = 0;
-        let lastTime = 0;
-
-        // 페이지 한 장이 넘어가는 전체 주기
-        const TURN_SECONDS = 1.0;
-
+        resizeBook();
+        window.addEventListener("resize", resizeBook);
+        let fold = 0,
+          last = 0,
+          nextTurn = 0,
+          turnNo = 0,
+          wasHover = false;
+        const TURN_GAP_MS = 500;
+        const TURN_DURATION_MS = 840; // same leaf motion time as before
         function animateMemoBook(ms) {
           requestAnimationFrame(animateMemoBook);
-
           if (document.hidden) {
-            lastTime = ms;
+            last = ms;
             return;
           }
-
-          const dt = lastTime ? Math.min((ms - lastTime) / 1000, 0.05) : 1 / 60;
-
-          lastTime = ms;
-
-          // 사진이 책 위에 올라와 있는지 확인
-          const hovered = dropZone.classList.contains("is-over");
-          const targetFold = hovered ? 1 : 0;
-
-          // 조금 더 접혔다가 자연스럽게 복귀
-          fold += (targetFold - fold) * (1 - Math.exp(-18 * dt));
-
+          const dt = last ? Math.min((ms - last) / 1000, 0.05) : 1 / 60;
+          last = ms;
+          const hovered = zone.classList.contains("is-over");
+          fold += ((hovered ? 1 : 0) - fold) * (1 - Math.exp(-18 * dt));
           leaves.forEach((leaf, i) => {
             leaf.rotation.y = restAngles[i] + (i < 3 ? -0.23 : 0.23) * fold;
           });
-
           back.rotation.y = -0.1 - 0.045 * fold;
-
           front.rotation.y = -Math.PI + 0.1 + 0.045 * fold;
-
-          // 책 전체가 아주 조금 들림
-          memoBook.position.y = BASE_Y + 0.025 * fold;
-
-          // ===================================
-          // 8. 한 장씩 반복해서 넘기기
-          // ===================================
-
+          lowerBook.position.y = BASE_Y + 0.025 * fold;
+          if (hovered && !wasHover) {
+            nextTurn = ms;
+            turnNo = 0;
+          }
           if (hovered) {
-            turnClock += dt;
-
-            const phase = (turnClock % TURN_SECONDS) / TURN_SECONDS;
-
-            // 0~0.84초: 페이지 넘어감
-            // 0.84~1초: 사라졌다가 처음으로 복귀
-            if (phase < 0.84) {
-              const p = phase / 0.84;
-
-              const eased = p * p * (3 - 2 * p);
-
-              const from = restAngles[1] - 0.23 * fold;
-
-              const to = -Math.PI + 0.25 + 0.23 * fold;
-
-              turningPage.visible = true;
-
-              turningPage.rotation.y = THREE.MathUtils.lerp(from, to, eased);
-
-              turningPage.rotation.z = 0;
-            } else {
-              // 넘어간 페이지를 잠깐 숨김
-              turningPage.visible = false;
+            // schedule using timestamps, NOT faster page rotation
+            if (ms >= nextTurn) {
+              const f = flips[turnNo % flips.length];
+              f.start = ms;
+              nextTurn = ms + TURN_GAP_MS;
+              turnNo++;
             }
           } else {
-            // 사진이 책에서 벗어나면 반복 중단
-            turningPage.visible = false;
-            turnClock = 0;
+            for (const f of flips) {
+              f.start = -Infinity;
+              f.obj.visible = false;
+            }
           }
-
-          bookRenderer.render(bookScene, bookCamera);
+          wasHover = hovered;
+          for (const f of flips) {
+            const p = (ms - f.start) / TURN_DURATION_MS;
+            if (!hovered || p < 0 || p >= 1) {
+              f.obj.visible = false;
+              continue;
+            }
+            const ease = p * p * (3 - 2 * p);
+            // LEFT (-PI) --> RIGHT (0), opposite of previous direction.
+            const from = -Math.PI + 0.25 + 0.23 * fold;
+            const to = -0.25 - 0.23 * fold;
+            f.obj.rotation.set(0, THREE.MathUtils.lerp(from, to, ease), 0);
+            f.obj.visible = true;
+          }
+          renderer2.render(bookScene, camera2);
         }
-
         requestAnimationFrame(animateMemoBook);
-      } catch (error) {
-        console.error("인화실 메모 책 오류:", error);
+      } catch (err) {
+        console.error("인화실 메모 책 생성 실패", err);
       }
     }
-
     setupMemoDropBook();
 
     // 메인 화면의 실제 사진 3장은 sketch.js에서 HTML 아크릴 카드로 구현합니다.

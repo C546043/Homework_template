@@ -10,9 +10,9 @@
     <title>Capture to Memo — Acrylic Album</title>
     <style>
       /* ============================================================
-   CAPTURE TO MEMO  /  ACRYLIC ALBUM EDITION
-   A single, consolidated stylesheet. No pins; no old overrides.
-   ============================================================ */
+         CAPTURE TO MEMO  /  ACRYLIC ALBUM EDITION
+         A single, consolidated stylesheet. No pins; no old overrides.
+         ============================================================ */
       :root {
         --ink: #192444;
         --muted: #74819e;
@@ -66,8 +66,8 @@
         letter-spacing: 0.18em;
       }
       /* ------------------------------------------------------------
-   01. CONTINUOUS COVER + DARKROOM WORLD
-   ------------------------------------------------------------ */
+         01. CONTINUOUS COVER + DARKROOM WORLD
+         ------------------------------------------------------------ */
       #world {
         position: relative;
         z-index: 0;
@@ -170,7 +170,7 @@
       }
       #cover-title {
         position: absolute;
-        top: 26%;
+        top: 20%;
         left: 6.3%;
         z-index: 5;
         width: 48%;
@@ -206,35 +206,58 @@
         font-weight: 440;
         letter-spacing: -0.02em;
       }
+
       .cover-controls {
         position: absolute;
         left: 6.3%;
-        bottom: 11.2%;
+        bottom: 16%;
         z-index: 12;
+
         display: flex;
         flex-wrap: wrap;
-        gap: 12px;
         align-items: center;
+        gap: 14px;
       }
+
       .pill {
-        border: 1px solid #dbe2f1;
+        min-height: 58px;
+        padding: 16px 28px;
+
+        border: 1px solid rgba(190, 203, 231, 0.8);
         border-radius: 100px;
-        white-space: nowrap;
-        padding: 14px 24px;
-        background: rgba(255, 255, 255, 0.87);
+
+        background: rgba(255, 255, 255, 0.94);
+        color: #273454;
+
+        font-size: 16px;
         font-weight: 750;
-        font-size: 14px;
-        color: #1b2747;
-        box-shadow: 0 9px 24px rgba(36, 60, 125, 0.07);
+        white-space: nowrap;
+
+        box-shadow: 0 10px 28px rgba(36, 60, 125, 0.1);
+
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease,
+          background 0.2s ease;
       }
+
+      /* 촬영하기: 메인 버튼 */
       .pill.primary {
-        color: white;
-        background: var(--blue);
-        border-color: var(--blue);
+        color: #fff;
+        background: linear-gradient(135deg, #7078ff 0%, #5558e9 100%);
+
+        border-color: rgba(96, 101, 239, 0.8);
+
+        box-shadow:
+          0 12px 30px rgba(83, 89, 224, 0.26),
+          inset 0 1px 0 rgba(255, 255, 255, 0.32);
       }
+
       .pill:hover {
-        filter: brightness(0.97);
+        transform: translateY(-3px);
+        box-shadow: 0 15px 32px rgba(67, 82, 167, 0.2);
       }
+
       /* 3 real photographs: translucent acrylic polaroids. NO pins. */
       #cover-photo-floats {
         position: absolute;
@@ -327,9 +350,9 @@
         }
       }
       /* ------------------------------------------------------------
-   THE PRINT ROOM — TWO CROSSING WIRES + PHYSICS POLAROIDS
-   앞줄: Firebase 실제 사진 | 뒷줄: 흐린 빈 폴라로이드
-   ------------------------------------------------------------ */
+         //THE PRINT ROOM — TWO CROSSING WIRES + PHYSICS POLAROIDS
+         //앞줄: Firebase 실제 사진 | 뒷줄: 흐린 빈 폴라로이드
+         ------------------------------------------------------------ */
       #world-wire-overlay {
         position: absolute;
         inset: 0;
@@ -355,13 +378,6 @@
       .world-page {
         z-index: 2;
       }
-      #cover {
-        z-index: 4;
-      }
-      #darkroom {
-        z-index: 2;
-      }
-
       #darkroom {
         display: block;
         overflow: visible;
@@ -577,8 +593,8 @@
         visibility: hidden;
       }
       /* ------------------------------------------------------------
-   02. THE ARCHIVE — SOLID PAGE, TRANSLUCENT ALBUMS
-   ------------------------------------------------------------ */
+         02. THE ARCHIVE — SOLID PAGE, TRANSLUCENT ALBUMS
+         ------------------------------------------------------------ */
       #archive-sheet {
         position: fixed;
         inset: 0;
@@ -1036,8 +1052,8 @@
         display: flex;
       }
       /* ------------------------------------------------------------
-   03. EDIT DIALOG, REAL PHOTO (UNCROPPED), TEXT FORMATTING
-   ------------------------------------------------------------ */
+         03. EDIT DIALOG, REAL PHOTO (UNCROPPED), TEXT FORMATTING
+         ------------------------------------------------------------ */
       .overlay {
         position: fixed;
         inset: 0;
@@ -1266,48 +1282,351 @@
         cursor: pointer;
         z-index: 3;
       }
-      .viewer {
-        z-index: 100;
-        background: rgba(10, 13, 22, 0.96);
-        display: flex;
+      /* =========================================================
+         GLASS EDITOR — IMAGE FIRST UI (REFINED)
+         ========================================================= */
+      .editor-overlay {
         align-items: center;
         justify-content: center;
-        padding: 50px 22px 25px;
+        padding: 20px;
+        background: rgba(14, 20, 34, 0.26);
+        backdrop-filter: blur(16px) saturate(1.04);
+        -webkit-backdrop-filter: blur(16px) saturate(1.04);
+        overflow: auto;
+        overscroll-behavior: contain;
       }
-      .viewer img {
+
+      .editor-modal {
+        position: relative;
+        width: min(980px, 92vw);
+        aspect-ratio: 15 / 8; /* 기존보다 세로를 줄임 */
+        height: auto;
+        min-height: 0;
+        padding: 0;
+        overflow: visible; /* 폴라로이드가 밖으로 튀어나오게 */
+        border-radius: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        background: linear-gradient(
+          145deg,
+          rgba(255, 255, 255, 0.14),
+          rgba(255, 255, 255, 0.06) 42%,
+          rgba(214, 224, 246, 0.08) 100%
+        );
+        box-shadow:
+          0 24px 80px rgba(18, 31, 62, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.32),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(26px) saturate(1.08);
+        -webkit-backdrop-filter: blur(26px) saturate(1.08);
+        touch-action: none;
+      }
+
+      .editor-modal::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(
+            circle at 18% 16%,
+            rgba(255, 255, 255, 0.24),
+            transparent 24%
+          ),
+          radial-gradient(
+            circle at 84% 12%,
+            rgba(255, 255, 255, 0.1),
+            transparent 22%
+          );
+      }
+
+      .editor-close {
+        position: absolute;
+        top: 18px;
+        right: 20px;
+        z-index: 6;
+        width: 46px;
+        height: 46px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        color: #33456c;
+        font-size: 24px;
+        font-weight: 700;
+        cursor: pointer;
+        backdrop-filter: blur(10px);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      }
+
+      .editor-shell {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: 0.92fr 1.08fr;
+        gap: 34px; /* 사진과 글 영역 간격 더 넓힘 */
         width: 100%;
         height: 100%;
-        object-fit: contain;
-        user-select: none;
+        padding: 24px 28px 20px;
       }
-      #viewer-close {
+
+      .editor-left {
+        min-width: 0;
+        min-height: 0;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        overflow: visible;
+      }
+
+      .editor-image-stage {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+        overflow: visible; /* 폴라로이드 잘리지 않게 */
+      }
+      .editor-polaroid {
         position: absolute;
-        right: 24px;
-        top: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.34);
-        background: rgba(255, 255, 255, 0.12);
-        color: white;
-        padding: 12px;
-        border-radius: 10px;
+        left: -6px; /* 창 왼쪽 바깥으로 조금 튀어나오게 */
+        top: 52%;
+        width: min(96%, 520px);
+        aspect-ratio: 168 / 208;
+        transform: translateY(-54%) rotate(-7deg);
+        padding: 14px 14px 58px;
+        border-radius: 4px; /* 거의 직각 */
+        border: 1px solid rgba(255, 255, 255, 0.82);
+        background: linear-gradient(
+          145deg,
+          rgba(255, 255, 255, 0.88),
+          rgba(241, 246, 255, 0.56)
+        );
+        box-shadow:
+          0 18px 42px rgba(25, 42, 78, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.95);
+        cursor: zoom-in;
+        z-index: 3;
       }
-      #toast {
-        position: fixed;
-        z-index: 150;
-        bottom: 95px;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 13px 20px;
-        border-radius: 100px;
-        background: #203052;
-        color: white;
-        box-shadow: 0 9px 26px rgba(0, 0, 0, 0.2);
-        font-size: 13px;
-        max-width: 90vw;
-        text-align: center;
+
+      .editor-polaroid-media {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        overflow: visible;
+        background: transparent;
+      }
+
+      .editor-polaroid-media img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain !important; /* 원본비율 최대한 유지 */
+        object-position: center;
+        pointer-events: none;
+        filter: drop-shadow(0 10px 16px rgba(18, 28, 56, 0.1));
+      }
+
+      .editor-polaroid-date {
+        margin-top: 18px;
+        width: 100%;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: rgba(56, 71, 104, 0.62);
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+      }
+
+      .editor-polaroid-title {
+        width: 100%;
+        margin-top: 4px;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: rgba(46, 58, 84, 0.88);
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+      }
+
+      .editor-right {
+        min-width: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding-top: 10px;
+        padding-left: 34px; /* 글 영역을 사진에서 더 멀리 */
+        position: relative;
+        z-index: 2;
+      }
+
+      .editor-topbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 8px;
+        padding-right: 62px;
+      }
+
+      .editor-heading-wrap {
+        min-width: 0;
+      }
+
+      .editor-kicker {
+        margin: 0 0 4px;
+        color: rgba(255, 255, 255, 0.52);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+      }
+
+      .editor-heading {
+        margin: 0;
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .editor-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+      }
+
+      .editor-btn {
+        min-height: 42px;
+        padding: 0 18px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        background: rgba(255, 255, 255, 0.1);
+        color: #33456c;
+        font-size: 15px;
+        font-weight: 800;
+        cursor: pointer;
+        backdrop-filter: blur(10px);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      }
+
+      .editor-btn.primary {
+        background: rgba(94, 110, 244, 0.88);
+        border-color: rgba(94, 110, 244, 0.88);
+        color: #fff;
+        box-shadow: 0 10px 26px rgba(87, 102, 232, 0.24);
+      }
+
+      .editor-writing-panel {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+        overflow: visible;
+        backdrop-filter: none;
+      }
+
+      .editor-writing-panel::before {
+        content: none;
+      }
+
+      .editor-note-surface {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        height: 100%;
+        min-height: 250px;
+        padding: 18px 2px 8px 0;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: rgba(255, 255, 255, 0.92); /* 글씨 흰색 계열 */
+        font-size: 16px;
+        line-height: 2.05;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        touch-action: manipulation;
+        user-select: text;
+        -webkit-user-select: text;
+        box-shadow: none;
+      }
+
+      .editor-note-surface:empty::before {
+        content: attr(data-placeholder);
+        color: rgba(255, 255, 255, 0.42);
+      }
+
+      .editor-note-surface * {
+        color: inherit;
+      }
+
+      @media (max-width: 980px) {
+        .editor-modal {
+          width: min(94vw, 94vw);
+          aspect-ratio: auto;
+          max-height: 82dvh;
+        }
+
+        .editor-shell {
+          grid-template-columns: 1fr;
+          gap: 12px;
+          padding: 18px 18px 16px;
+          overflow-y: auto;
+        }
+
+        .editor-left {
+          min-height: 340px;
+          overflow: visible;
+        }
+
+        .editor-image-stage {
+          min-height: 320px;
+        }
+
+        .editor-polaroid {
+          width: min(78vw, 430px);
+          left: 6px;
+          top: 50%;
+          transform: translateY(-52%) rotate(-6deg);
+        }
+
+        .editor-topbar {
+          padding-right: 56px;
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .editor-actions {
+          width: 100%;
+          justify-content: flex-end;
+        }
+
+        .editor-note-surface {
+          min-height: 240px;
+          padding-right: 2px;
+          font-size: 15px;
+          line-height: 1.95;
+        }
+
+        .editor-heading {
+          font-size: 14px;
+        }
+
+        .editor-polaroid-title {
+          font-size: 24px;
+        }
       }
       /* ------------------------------------------------------------
-   04. BULK SELECTION
-   ------------------------------------------------------------ */
+         04. BULK SELECTION
+         ------------------------------------------------------------ */
       #batch-bar {
         position: fixed;
         left: 50%;
@@ -1376,8 +1695,8 @@
         display: block;
       }
       /* ------------------------------------------------------------
-   05. RESPONSIVE + REDUCED MOTION
-   ------------------------------------------------------------ */
+         05. RESPONSIVE + REDUCED MOTION
+         ------------------------------------------------------------ */
       @media (max-width: 1020px) {
         #cover-title {
           left: 5.5%;
@@ -1505,167 +1824,164 @@
         }
       }
 
-      /* ==================================
-   인화실 하단 3D 메모 책
-================================== */
-
-      #memo-drop-zone {
-        position: fixed;
-        left: 50%;
-        bottom: 8px;
-        transform: translateX(-50%);
-
-        width: min(430px, 56vw);
-        height: 145px;
-
-        border: none;
-        border-radius: 0;
-        background: transparent;
-        box-shadow: none;
-        padding: 0;
-        overflow: visible;
-
-        pointer-events: none;
-        z-index: 6;
-      }
-
-      #memo-book-3d {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-
-        pointer-events: none;
-        overflow: visible;
-
-        filter: drop-shadow(0 10px 18px rgba(71, 95, 166, 0.18));
-        transition: filter 0.16s ease;
-      }
-
-      #memo-book-3d canvas {
-        display: block;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-      }
-
-      #memo-drop-zone.is-over #memo-book-3d {
-        filter: drop-shadow(0 12px 24px rgba(73, 101, 208, 0.26));
-      }
-
-      .memo-drop-hint {
-        position: absolute;
-        left: 50%;
-        bottom: -10px;
-        transform: translateX(-50%);
-
-        text-align: center;
-        color: #7d8eb1;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        white-space: nowrap;
-
-        pointer-events: none;
-      }
-
-      /* 인화실 하단 책: 크기 및 위치 최종 조정 */
-      #memo-drop-zone {
-        position: fixed;
-        left: 50%;
-        bottom: 20px;
-        transform: translateX(-50%);
-
-        width: min(800px, 92vw);
-        height: clamp(240px, 37vh, 350px);
-
-        padding: 0;
-        border: none;
-        background: transparent;
-        box-shadow: none;
-        overflow: visible;
-        pointer-events: none;
-        z-index: 6;
-      }
-
-      #memo-book-3d {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        overflow: visible;
-        pointer-events: none;
-      }
-
-      #memo-book-3d canvas {
-        display: block;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-      }
-
-      #memo-drop-zone.is-over {
-        border: none;
-        background: transparent;
-      }
-
-      /* 책을 화면이 아니라 인화실에 고정 */
-      #darkroom {
-        position: relative;
-        z-index: 4;
-        overflow: visible;
-      }
-
-      #memo-drop-zone {
-        position: absolute !important;
-        left: 50% !important;
-        right: auto !important;
-        bottom: -45px !important;
-        transform: translateX(-50%) !important;
-        z-index: 2 !important;
-      }
-
-      /* 드래그한 사진은 책 위에 표시 */
-      #darkroom-scene {
-        position: absolute;
-        z-index: 4;
-        overflow: visible !important;
-      }
-
-      #front-photo-layer {
-        overflow: visible !important;
-      }
-
-      /* 기존 두 화면 200vw + 가위 구역 24vw */
+      /* === Integrated 2026-10-26: book behind entrance, photobook, scissors, desk === */
       #world-track {
-        width: 224vw !important;
-      }
-
-      /* 줄은 가위 구역 안까지 이어지지 않음 */
-      #world-wire-overlay {
         width: 200vw !important;
       }
-
-      /* 인화실 오른쪽 파기 공간 */
-      #shred-zone {
+      #world-wire-overlay {
+        width: 100%;
+        z-index: 1;
+      }
+      #world-wire-overlay path {
+        vector-effect: non-scaling-stroke;
+        stroke: rgba(84, 113, 177, 0.48);
+        stroke-linecap: round;
+        stroke-width: 1.6;
+        fill: none;
+      }
+      #cover {
+        z-index: 6;
+        overflow: visible;
+      }
+      #darkroom {
         position: relative;
-        flex: 0 0 24vw;
-        width: 24vw;
+        z-index: 3;
+        overflow: visible;
+      }
+      #darkroom-scene {
+        z-index: 9;
+        overflow: visible;
+        pointer-events: none;
+      }
+      #front-photo-layer {
+        z-index: 3;
+        overflow: visible;
+        pointer-events: none;
+      }
+      #front-photo-layer .hanging-polaroid {
+        pointer-events: auto;
+        touch-action: none;
+      }
+      .cover-float-card img,
+      .hanging-polaroid img,
+      .album-photo img {
+        object-fit: cover !important;
+        object-position: center center !important;
+        background: transparent !important;
+      }
+      .edit-image,
+      .viewer img {
+        object-fit: contain !important;
+        object-position: center center !important;
+      }
+      .hanging-polaroid.detached,
+      .hanging-polaroid.dragging {
+        cursor: grabbing;
+      }
+      .ctm-detach-ring {
+        position: absolute;
+        left: 50%;
+        top: -12px;
+        width: 22px;
+        height: 22px;
+        border: 2px solid rgba(105, 158, 248, 0.84);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 51;
+        box-shadow: 0 0 13px rgba(104, 153, 246, 0.42);
+      }
+      .ctm-detach-spark {
+        position: absolute;
+        left: 50%;
+        top: -12px;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #b6f1ff;
+        pointer-events: none;
+        z-index: 52;
+      }
+      #memo-drop-zone {
+        position: absolute;
+        left: calc(50% - 100px);
+        bottom: -38px;
+        width: min(800px, 90vw);
+        height: clamp(250px, 36vh, 355px);
+        transform: translateX(-50%);
+        z-index: 5;
+        pointer-events: none;
+        background: transparent;
+        border: 0;
+        overflow: visible;
+      }
+      #memo-book-desk {
+        position: absolute;
+        z-index: 0;
+        left: 50%;
+        bottom: 50px;
+        width: 96%;
+        height: 118px;
+        transform: translateX(-50%) perspective(600px) rotateX(63deg);
+        transform-origin: center bottom;
+        border: 1px solid rgba(170, 192, 235, 0.5);
+        border-radius: 30px 30px 22px 22px;
+        background: linear-gradient(
+          150deg,
+          rgba(247, 249, 255, 0.91),
+          rgba(198, 215, 246, 0.88)
+        );
+        box-shadow:
+          0 22px 35px rgba(65, 88, 141, 0.17),
+          inset 0 2px 0 rgba(255, 255, 255, 0.96);
+        pointer-events: none;
+      }
+      #memo-book-3d {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        filter: drop-shadow(0 12px 16px rgba(57, 75, 134, 0.22));
+      }
+      #memo-book-3d canvas {
+        display: block;
+        width: 100%;
         height: 100%;
-        overflow: hidden;
+        pointer-events: none;
+      }
+      .memo-drop-hint {
+        position: absolute;
         z-index: 2;
-
+        bottom: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 11px;
+        font-weight: 750;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+        color: #8293b7;
+        pointer-events: none;
+      }
+      #memo-drop-zone.is-over #memo-book-3d {
+        filter: drop-shadow(0 12px 24px rgba(79, 108, 222, 0.32));
+      }
+      #shred-zone {
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: clamp(90px, 12vw, 210px);
+        height: 100%;
+        z-index: 4;
+        overflow: hidden;
+        pointer-events: none;
+        color: rgba(255, 255, 255, 0.9);
         background: linear-gradient(
           90deg,
-          rgba(25, 28, 37, 0) 0%,
-          rgba(25, 28, 37, 0.72) 22%,
-          #14161d 53%,
-          #08090c 100%
+          rgba(14, 17, 25, 0),
+          rgba(16, 18, 25, 0.65) 26%,
+          rgba(9, 11, 17, 0.96) 75%,
+          #090a0d
         );
-
-        color: rgba(255, 255, 255, 0.9);
       }
-
       .shred-zone-content {
         position: absolute;
         inset: 0;
@@ -1673,103 +1989,872 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 14px;
-        padding: 15px;
-
+        gap: 12px;
+        text-align: center;
+        padding: 10px;
         pointer-events: none;
-        transition: transform 0.2s ease;
+        transition: transform 0.15s;
       }
-
-      .shred-zone-content svg {
-        filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.22));
-      }
-
       .shred-zone-content strong {
-        font-size: 13px;
-        letter-spacing: 0.18em;
+        font-size: 12px;
+        letter-spacing: 0.13em;
       }
-
       .shred-zone-content span {
         font-size: 10px;
-        opacity: 0.52;
-        text-align: center;
+        line-height: 1.4;
+        opacity: 0.62;
       }
-
-      /* 사진이 파기 구역 위에 오면 즉시 반응 */
       #shred-zone.is-over {
         background: linear-gradient(
           90deg,
-          rgba(35, 40, 52, 0) 0%,
-          rgba(50, 58, 77, 0.85) 25%,
-          #222633 100%
+          rgba(14, 17, 25, 0),
+          rgba(36, 43, 67, 0.82) 26%,
+          #171a28
         );
       }
-
       #shred-zone.is-over .shred-zone-content {
-        transform: scale(1.08);
+        transform: scale(1.07);
       }
-      /* 가위 구역을 별도 화면이 아닌 인화실 오른쪽에 배치 */
-      #world-track {
-        width: 200vw !important;
+      @media (max-width: 660px) {
+        #memo-drop-zone {
+          width: 90vw;
+          height: clamp(170px, 29vh, 250px);
+          bottom: -25px;
+        }
+        .memo-drop-hint {
+          bottom: 11px;
+        }
+        #memo-book-desk {
+          height: 70px;
+          bottom: 30px;
+        }
+        #shred-zone {
+          width: clamp(70px, 12vw, 100px);
+        }
+        #shred-zone .shred-zone-content svg {
+          width: 40px;
+          height: 40px;
+        }
+      }
+      /* ========================================================
+         PEN PATCH — index.html 스타일 마지막 부분에 추가
+         기존 편집기 스타일은 삭제하지 않음
+         ======================================================== */
+
+      /* 현재 크기에서 폴라로이드를 약 1.3배 키우고 왼쪽으로 확장 */
+      .editor-modal .editor-polaroid {
+        width: min(125%, 676px);
+        left: -23%;
+        transform: translateY(-54%) rotate(-7deg);
+        transform-origin: center center;
       }
 
-      #shred-zone {
-        position: absolute !important;
-        top: 0;
-        right: 0;
-        left: auto;
-
-        width: clamp(90px, 12vw, 210px);
+      /* 선은 팝업 표면 위에 얹히며, 밖으로 나온 사진 위까지 그려진다 */
+      .editor-modal .editor-ink-art {
+        position: absolute;
+        inset: 0;
+        width: 100%;
         height: 100%;
-        flex: none !important;
-        z-index: 3;
-        overflow: hidden;
-
-        background: linear-gradient(
-          90deg,
-          rgba(15, 17, 23, 0) 0%,
-          rgba(15, 17, 23, 0.55) 25%,
-          rgba(12, 13, 18, 0.9) 65%,
-          #08090c 100%
-        );
-
-        color: rgba(255, 255, 255, 0.92);
+        overflow: visible !important;
+        pointer-events: none;
+        z-index: 20;
+      }
+      .editor-modal .editor-ink-art path {
+        fill: none;
+        stroke: #9cdeff;
+        stroke-width: 3.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        vector-effect: non-scaling-stroke;
+        filter: drop-shadow(0 0 2px rgba(209, 244, 255, 0.35));
       }
 
-      /* ==========================================
-   모든 폴라로이드: 이미지 영역 꽉 채우기
-========================================== */
+      /* 사용자 SVG 그대로 사용. 활성화하면 흰 네온 표시 */
+      .editor-modal .editor-pen-toggle {
+        position: absolute;
+        left: 40%;
+        top: -46px;
+        width: 60px;
+        height: 112px;
+        border: 0;
+        padding: 8px;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        cursor: pointer;
+        z-index: 25;
+        transform: rotate(17deg);
+        transition: transform 0.15s ease;
+        touch-action: manipulation;
+      }
+      .editor-modal .editor-pen-toggle img {
+        display: block;
+        width: auto;
+        height: 90px;
+        max-width: 100%;
+        pointer-events: none;
+        transition: filter 0.18s ease;
+      }
+      .editor-modal .editor-pen-toggle.is-active {
+        transform: rotate(9deg) translateY(-3px);
+      }
+      .editor-modal .editor-pen-toggle.is-active img {
+        filter: drop-shadow(0 0 5px #fff)
+          drop-shadow(0 0 14px rgba(255, 255, 255, 0.98))
+          drop-shadow(0 0 23px rgba(215, 242, 255, 0.9)) brightness(1.15);
+      }
+      .editor-modal.editor-inking {
+        touch-action: none;
+        cursor: crosshair;
+      }
+      .editor-modal.editor-inking
+        *:not(.editor-pen-toggle):not(.editor-pen-toggle img) {
+        cursor: crosshair;
+      }
 
-      /* 메인 화면 랜덤 사진 3장 */
-      .cover-float-card img,
+      @media (max-width: 980px) {
+        .editor-modal .editor-polaroid {
+          width: min(101vw, 559px);
+          left: -12vw;
+        }
+        .editor-modal .editor-pen-toggle {
+          left: 49%;
+          top: -38px;
+          height: 91px;
+        }
+        .editor-modal .editor-pen-toggle img {
+          height: 76px;
+        }
+      }
 
-/* 인화실 줄에 걸린 사진 */
-.hanging-polaroid img,
+      /* ==================================
+         PEN SIZE + POLAROID SIZE FIX
+      ================================== */
 
-/* 보관함 앨범 안 사진 */
-.album-photo img {
-        object-fit: cover !important;
-        object-position: center center !important;
+      /* 폴라로이드: 펜 추가 전 크기로 복귀 */
+      .editor-modal .editor-polaroid {
+        width: min(96%, 520px);
+        left: -6px;
+        transform: translateY(-54%) rotate(-7deg);
+      }
+
+      /* 펜 아이콘과 터치 영역 확대 */
+      .editor-modal .editor-pen-toggle {
+        width: 88px;
+        height: 140px;
+        top: -57px;
+        padding: 5px;
+      }
+
+      .editor-modal .editor-pen-toggle img {
+        height: 116px;
+        max-width: 100%;
+      }
+
+      /* 태블릿 */
+      @media (max-width: 980px) {
+        .editor-modal .editor-polaroid {
+          width: min(78vw, 430px);
+          left: 6px;
+        }
+
+        .editor-modal .editor-pen-toggle {
+          width: 80px;
+          height: 125px;
+          top: -49px;
+        }
+
+        .editor-modal .editor-pen-toggle img {
+          height: 102px;
+        }
+      }
+
+      /* 펜 ON: 메모 글보다 그림 그리기가 우선 */
+      .editor-modal.editor-inking .editor-note-surface,
+      .editor-modal.editor-inking .editor-polaroid-title,
+      .editor-modal.editor-inking .editor-polaroid-date {
+        pointer-events: none !important;
+        touch-action: none !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+      }
+
+      .editor-modal.editor-inking,
+      .editor-modal.editor-inking .editor-writing-panel {
+        touch-action: none !important;
+      }
+
+      /* 그림이 버튼 클릭을 가리지 않음 */
+      .editor-modal .editor-ink-art {
+        pointer-events: none !important;
+        touch-action: none;
+      }
+
+      /* 취소, 저장, X 버튼 우선 */
+      .editor-modal .editor-actions,
+      .editor-modal .editor-close {
+        pointer-events: auto;
+      }
+
+      /* 사진만 확대, 날짜와 제목은 입력 */
+      .editor-polaroid-media {
+        cursor: zoom-in;
+      }
+
+      .editor-polaroid-title,
+      .editor-polaroid-date {
+        cursor: text;
+      }
+      /* CTM ERASER - 지우개 버튼 스타일 */
+      .editor-modal .editor-eraser-toggle {
+        position: absolute;
+        left: calc(40% + 82px);
+        top: -35px;
+        width: 72px;
+        height: 116px;
+        border: 0;
+        padding: 6px;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        cursor: pointer;
+        z-index: 26;
+        transform: rotate(-13deg);
+        transition: transform 0.15s ease;
+        touch-action: manipulation;
+        pointer-events: auto;
+      }
+      .editor-modal .editor-eraser-toggle img {
+        display: block;
+        width: auto;
+        height: 94px;
+        max-width: 100%;
+        pointer-events: none;
+        transition: filter 0.18s ease;
+      }
+      .editor-modal .editor-eraser-toggle.is-active {
+        transform: rotate(-7deg) translateY(-3px);
+      }
+      .editor-modal .editor-eraser-toggle.is-active img {
+        filter: drop-shadow(0 0 5px #fff)
+          drop-shadow(0 0 14px rgba(255, 255, 255, 0.98))
+          drop-shadow(0 0 23px rgba(215, 242, 255, 0.9)) brightness(1.15);
+      }
+      /* 펜 또는 지우개 ON: 글 위에서도 그리기/지우기가 우선 */
+      .editor-modal.editor-inking .editor-note-surface,
+      .editor-modal.editor-inking .editor-polaroid-title,
+      .editor-modal.editor-inking .editor-polaroid-date {
+        pointer-events: none !important;
+        touch-action: none !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+      }
+      .editor-modal.editor-inking .editor-ink-art {
+        pointer-events: none !important;
+      }
+      /* 기존 펜 커서 규칙보다 우선하여 지우개 표시 */
+      .editor-modal.editor-erasing,
+      .editor-modal.editor-erasing *:not(button):not(button *) {
+        cursor: cell;
+      }
+      .editor-modal .editor-eraser-toggle,
+      .editor-modal .editor-pen-toggle,
+      .editor-modal .editor-actions button,
+      .editor-modal .editor-close {
+        pointer-events: auto !important;
+      }
+      @media (max-width: 980px) {
+        .editor-modal .editor-eraser-toggle {
+          left: calc(49% + 78px);
+          top: -28px;
+          width: 66px;
+          height: 102px;
+        }
+        .editor-modal .editor-eraser-toggle img {
+          height: 82px;
+        }
+      }
+
+      /* 지우개를 펜 아래로 이동하고 크기 축소 */
+      .editor-modal .editor-eraser-toggle {
+        left: calc(40% + 18px) !important;
+        top: 60px !important;
+        width: 42px !important;
+        height: 62px !important;
+        padding: 2px !important;
+        transform: rotate(-13deg) !important;
+      }
+
+      .editor-modal .editor-eraser-toggle img {
+        height: 54px !important;
+        width: auto !important;
+        max-width: 100% !important;
+      }
+
+      .editor-modal .editor-eraser-toggle.is-active {
+        transform: rotate(-7deg) translateY(-2px) !important;
+      }
+
+      /* 보관함 폴라로이드: 기존 2열을 3열로 */
+      .album-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: clamp(8px, 1vw, 14px) !important;
+      }
+
+      /* 날짜 대신 제목 표시 */
+      .album-photo::after {
+        content: attr(data-title) !important;
+        left: 6px !important;
+        right: 6px !important;
+        width: auto !important;
+        overflow: hidden !important;
+        white-space: nowrap !important;
+        text-overflow: ellipsis !important;
+        text-align: left !important;
+      }
+      /* CAPTURE TO MEMO — ARCHIVE LOOP BACKGROUND
+         Paste just before the LAST closing style tag in index.html.
+         Needs archive-ribbons.svg beside index.html.
+      */
+
+      /* No opaque white plate: translucent lavender-blue glass over the existing app. */
+      #archive-sheet {
+        background: linear-gradient(
+          130deg,
+          rgba(207, 220, 254, 0.83) 0%,
+          rgba(153, 181, 246, 0.6) 51%,
+          rgba(199, 213, 250, 0.81) 100%
+        ) !important;
+        -webkit-backdrop-filter: blur(36px) saturate(1.17);
+        backdrop-filter: blur(36px) saturate(1.17);
+        isolation: isolate;
+      }
+
+      /* Seamless transparent ribbon art. JS shifts background only 0.12px per 1px of album scroll. */
+      #archive-sheet::before {
+        content: "" !important;
+        position: absolute !important;
+        inset: 0 !important;
+        z-index: 0 !important;
+        pointer-events: none !important;
+        background-color: transparent !important;
+        background-image: url("./archive-ribbons.svg") !important;
+        background-repeat: repeat-x !important;
+        background-size: 1440px 100% !important;
+        background-position: var(--archive-ribbon-x, 0px) center !important;
+        filter: none !important;
+        opacity: 0.96;
+        will-change: background-position;
+      }
+
+      /* Subtle blue-light ambience behind the translucent albums. */
+      #archive-sheet::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse 65% 55% at 54% 40%,
+          rgba(255, 255, 255, 0.13),
+          transparent 75%
+        );
+      }
+      #archive-sheet > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* Remove the old top header and move its existing controls to a bottom glass dock. */
+      #archive-sheet .archive-header {
+        position: absolute !important;
+        z-index: 20 !important;
+        top: auto !important;
+        bottom: max(17px, env(safe-area-inset-bottom)) !important;
+        left: 50% !important;
+        width: min(810px, calc(100vw - 30px)) !important;
+        margin: 0 !important;
+        padding: 13px 17px !important;
+        transform: translateX(-50%) !important;
+        border: 1px solid rgba(255, 255, 255, 0.58) !important;
+        border-radius: 25px !important;
+        background: linear-gradient(
+          118deg,
+          rgba(237, 244, 255, 0.28),
+          rgba(220, 231, 255, 0.13)
+        ) !important;
+        box-shadow:
+          0 12px 40px rgba(45, 70, 127, 0.17),
+          inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+        -webkit-backdrop-filter: blur(28px) saturate(1.35) !important;
+        backdrop-filter: blur(28px) saturate(1.35) !important;
+      }
+      #archive-sheet .archive-brand,
+      #archive-sheet .archive-grip {
+        display: none !important;
+      }
+      #archive-sheet .archive-mini-bar {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 11px !important;
+      }
+      #archive-sheet .archive-tools {
+        order: 0 !important;
+        display: flex !important;
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        width: auto !important;
+        margin: 0 !important;
+        gap: 9px !important;
+        flex-wrap: nowrap !important;
+      }
+      #archive-sheet .archive-tools input {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: auto !important;
+        height: 44px !important;
+        padding: 0 14px !important;
+        border: 1px solid rgba(255, 255, 255, 0.65) !important;
+        border-radius: 13px !important;
+        background: rgba(242, 247, 255, 0.27) !important;
+        color: #354772 !important;
+        outline-color: #6b7eec;
+        font-size: 13px;
+      }
+      #archive-sheet #archive-search {
+        flex: 1.35 1 0 !important;
+      }
+      #archive-sheet #archive-date {
+        flex: 1 1 0 !important;
+      }
+      #archive-sheet .archive-tools button,
+      #archive-sheet .archive-close {
+        height: 44px !important;
+        padding: 0 15px !important;
+        border: 1px solid rgba(255, 255, 255, 0.62) !important;
+        border-radius: 13px !important;
+        background: rgba(236, 244, 255, 0.29) !important;
+        color: #4159a7 !important;
+        white-space: nowrap;
+        font-size: 13px;
+      }
+      #archive-sheet .archive-close {
+        order: 1;
+        flex: 0 0 auto;
+      }
+      #archive-sheet .archive-rail {
+        padding-top: 24px !important;
+        padding-bottom: 122px !important;
         background: transparent !important;
       }
-
-      /* 메모 편집창에서는 반드시 원본 비율 유지 */
-      .edit-image,
-      .viewer img {
-        object-fit: contain !important;
-        object-position: center center !important;
+      /* Make the existing acrylic pages reveal some of the new background. */
+      #archive-sheet .album-page:first-child {
+        background: linear-gradient(
+          95deg,
+          rgba(249, 252, 255, 0.69),
+          rgba(218, 234, 255, 0.49)
+        ) !important;
       }
-      /* 책이 사진보다 위에 있어야 '책 뒤에서 나오는' 것처럼 보임 */
-      #front-photo-layer {
+      #archive-sheet .album-page:nth-child(2) {
+        background: linear-gradient(
+          95deg,
+          rgba(220, 234, 255, 0.48),
+          rgba(249, 252, 255, 0.67)
+        ) !important;
+      }
+      /* Remove the three oval rings (keep the simple soft center fold). */
+      #archive-sheet .album-spread::after {
+        content: none !important;
+        display: none !important;
+      }
+      #archive-sheet .album-spread::before {
+        left: calc(50% - 5px) !important;
+        width: 10px !important;
+        background: linear-gradient(
+          90deg,
+          rgba(73, 101, 160, 0.15),
+          rgba(255, 255, 255, 0.58),
+          rgba(73, 101, 160, 0.12)
+        ) !important;
+        filter: blur(2px) !important;
+      }
+
+      @media (max-width: 670px) {
+        #archive-sheet .archive-header {
+          width: calc(100vw - 16px) !important;
+          bottom: max(8px, env(safe-area-inset-bottom)) !important;
+          padding: 10px !important;
+          border-radius: 18px !important;
+        }
+        #archive-sheet .archive-mini-bar {
+          gap: 6px !important;
+        }
+        #archive-sheet .archive-tools {
+          gap: 5px !important;
+        }
+        #archive-sheet .archive-tools input {
+          height: 38px !important;
+          padding: 0 7px !important;
+          font-size: 11px;
+        }
+        #archive-sheet .archive-tools button,
+        #archive-sheet .archive-close {
+          height: 38px !important;
+          padding: 0 7px !important;
+          font-size: 11px;
+        }
+        #archive-sheet .archive-rail {
+          padding-bottom: 95px !important;
+        }
+      }
+      /* CTM archive: lightweight white background + subtle floating decorations.
+         Place BEFORE the closing style tag; no JS animation is used here. */
+      #archive-sheet {
+        background: #f8faff !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        isolation: isolate;
+      }
+      #archive-sheet::before {
+        content: "" !important;
+        position: absolute !important;
+        inset: 0 !important;
+        z-index: 0 !important;
+        pointer-events: none !important;
+        background-color: transparent !important;
+        background-image: url("./archive-soft-decor.svg") !important;
+        background-repeat: repeat-x !important;
+        background-size: 1400px 100% !important;
+        background-position: 0 center !important;
+        filter: none !important;
+        opacity: 0.86 !important;
+        will-change: auto !important;
+        transform: none !important;
+      }
+      #archive-sheet::after {
+        content: none !important;
+        display: none !important;
+      }
+      #archive-sheet > * {
+        position: relative;
+        z-index: 1;
+      }
+      /* Keep pages translucent, but remove expensive per-album blurring. */
+      #archive-sheet .album-spread,
+      #archive-sheet .album-page {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+      #archive-sheet .album-page:first-child {
+        background: linear-gradient(
+          98deg,
+          rgba(255, 255, 255, 0.87),
+          rgba(237, 245, 255, 0.8)
+        ) !important;
+      }
+      #archive-sheet .album-page:nth-child(2) {
+        background: linear-gradient(
+          98deg,
+          rgba(238, 246, 255, 0.78),
+          rgba(255, 255, 255, 0.86)
+        ) !important;
+      }
+      /* Bottom-center mini control tray, not a large top toolbar. */
+      #archive-sheet .archive-header {
+        position: absolute !important;
+        z-index: 15 !important;
+        top: auto !important;
+        bottom: max(15px, env(safe-area-inset-bottom)) !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: min(570px, calc(100vw - 28px)) !important;
+        margin: 0 !important;
+        padding: 8px 10px !important;
+        border-radius: 19px !important;
+        border: 1px solid rgba(255, 255, 255, 0.85) !important;
+        background: rgba(231, 239, 253, 0.76) !important;
+        box-shadow:
+          0 9px 26px rgba(62, 82, 138, 0.12),
+          inset 0 1px 0 rgba(255, 255, 255, 0.88) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        backdrop-filter: blur(8px) !important;
+      }
+      #archive-sheet .archive-brand,
+      #archive-sheet .archive-grip {
+        display: none !important;
+      }
+      #archive-sheet .archive-mini-bar {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0 !important;
+      }
+      #archive-sheet .archive-tools {
+        display: flex !important;
+        flex: 1 1 auto !important;
+        align-items: center !important;
+        flex-wrap: nowrap !important;
+        justify-content: center !important;
+        min-width: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        gap: 7px !important;
+      }
+      #archive-sheet .archive-tools input {
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+        width: auto !important;
+        height: 34px !important;
+        padding: 0 9px !important;
+        border: 1px solid #dbe4f7 !important;
+        border-radius: 9px !important;
+        background: rgba(255, 255, 255, 0.73) !important;
+        font-size: 12px !important;
+        color: #425577 !important;
+      }
+      #archive-sheet #archive-search {
+        flex: 1 1 195px !important;
+      }
+      #archive-sheet #archive-date {
+        flex: 0 1 154px !important;
+      }
+      #archive-sheet .archive-tools button {
+        flex: 0 0 auto !important;
+        height: 34px !important;
+        padding: 0 10px !important;
+        border: 1px solid #dbe4f7 !important;
+        border-radius: 9px !important;
+        background: rgba(255, 255, 255, 0.74) !important;
+        color: #4b5fc3 !important;
+        font-size: 12px !important;
+        font-weight: 750 !important;
+      }
+      /* Top-centered reverse tab. The SAME existing archive-close button keeps its JS click handler. */
+      #archive-sheet > #archive-close {
+        position: absolute !important;
+        z-index: 20 !important;
+        top: 0 !important;
+        bottom: auto !important;
+        left: 50% !important;
+        right: auto !important;
+        transform: translateX(-50%) !important;
+        width: min(380px, 80vw) !important;
+        height: 57px !important;
+        padding: 13px 24px 9px !important;
+        border: 1px solid rgba(255, 255, 255, 0.94) !important;
+        border-top: 0 !important;
+        border-radius: 0 0 20px 20px !important;
+        background: linear-gradient(
+          125deg,
+          rgba(255, 255, 255, 0.93),
+          rgba(220, 230, 255, 0.87)
+        ) !important;
+        color: #565fe6 !important;
+        font-size: 15px !important;
+        font-weight: 900 !important;
+        letter-spacing: 0.045em !important;
+        white-space: nowrap !important;
+        box-shadow: 0 10px 30px rgba(43, 74, 146, 0.1) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        backdrop-filter: blur(8px) !important;
+        cursor: pointer !important;
+      }
+      #archive-sheet > #archive-close::before {
+        content: "";
+        position: absolute;
+        top: 6px;
+        left: 50%;
+        width: 42px;
+        height: 4px;
+        transform: translateX(-50%);
+        border-radius: 8px;
+        background: #a6b6ed;
+      }
+      /* Move album row slightly below center (existing horizontal scroll preserved). */
+      #archive-sheet #album-rail {
+        padding-top: clamp(92px, 12vh, 115px) !important;
+        padding-bottom: 72px !important;
+        background: transparent !important;
+        align-items: center !important;
+      }
+      /* Remove the three oval decorations from the center of every album. */
+      #archive-sheet .album-spread::after {
+        content: none !important;
+        display: none !important;
+      }
+      #archive-sheet .album-spread::before {
+        left: calc(50% - 5px) !important;
+        width: 10px !important;
+        background: linear-gradient(
+          90deg,
+          rgba(84, 111, 164, 0.11),
+          rgba(255, 255, 255, 0.58),
+          rgba(84, 111, 164, 0.11)
+        ) !important;
+        filter: blur(1px) !important;
+      }
+      @media (max-width: 670px) {
+        #archive-sheet .archive-header {
+          width: calc(100vw - 16px) !important;
+          bottom: max(8px, env(safe-area-inset-bottom)) !important;
+          padding: 6px !important;
+          border-radius: 13px !important;
+        }
+        #archive-sheet .archive-tools {
+          gap: 4px !important;
+        }
+        #archive-sheet .archive-tools input {
+          height: 32px !important;
+          padding: 0 6px !important;
+          font-size: 11px !important;
+        }
+        #archive-sheet #archive-search {
+          flex: 1 1 100px !important;
+        }
+        #archive-sheet #archive-date {
+          flex: 0 1 125px !important;
+        }
+        #archive-sheet .archive-tools button {
+          height: 32px !important;
+          padding: 0 7px !important;
+          font-size: 11px !important;
+        }
+        #archive-sheet > #archive-close {
+          height: 49px !important;
+          width: min(300px, 80vw) !important;
+          font-size: 12px !important;
+        }
+        #archive-sheet #album-rail {
+          padding-top: 70px !important;
+          padding-bottom: 78px !important;
+        }
+      }
+      /* ARCHIVE POLAROID — glossy blue pushpin + gravity swing
+         Add this ABOVE the closing style tag, after existing archive CSS.
+         One pin is drawn per photo. No extra image or dependency needed. */
+      #archive-sheet .album-photo {
+        /* the pin's center is at y=10px: rotate around that fixed point */
+        transform-origin: 50% 10px !important;
+        transform: rotate(
+          calc(var(--photo-angle, 0deg) + var(--swing-angle, 0deg))
+        ) !important;
+        transition:
+          filter 0.18s ease,
+          box-shadow 0.18s ease !important;
+      }
+
+      #archive-sheet .album-photo::before {
+        content: "" !important;
+        position: absolute;
+        left: 50%;
+        top: 2px;
+        width: 10px;
+        height: 10px;
+        transform: translateX(-50%);
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 30% 27%,
+          #ffffff 0%,
+          #e4fcff 12%,
+          #8be0ff 29%,
+          #4a9cf3 53%,
+          #2660b9 76%,
+          #183f8f 100%
+        );
+        box-shadow:
+          inset -1px -2px 3px rgba(10, 45, 118, 0.35),
+          inset 1px 1px 2px rgba(255, 255, 255, 0.9),
+          0 2px 4px rgba(29, 84, 160, 0.32),
+          0 0 7px rgba(115, 212, 255, 0.28);
         z-index: 4;
+        pointer-events: none;
       }
 
-      #memo-book-wrap,
-      #drop-book-wrap,
-      #darkroom-drop-book,
-      .memo-drop-book {
-        z-index: 7;
+      /* Only moving cards request GPU compositing: keep large archives light. */
+      #archive-sheet .album-photo.is-swinging {
+        will-change: transform;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #archive-sheet .album-photo {
+          --swing-angle: 0deg !important;
+        }
+      }
+
+      /* 인화실 책 위 안내 문구 */
+      #memo-drop-zone .memo-drop-hint {
+        position: absolute;
+        top: clamp(24px, 6vh, 56px);
+        bottom: auto !important;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 5;
+
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+
+        width: max-content;
+        max-width: 90vw;
+        text-align: center;
+        white-space: normal;
+
         pointer-events: none;
+      }
+
+      #memo-drop-zone .book-guide-eng {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        color: #989fce;
+      }
+
+      /* 메인 안내 문구 */
+      #memo-drop-zone .book-guide-title {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 600;
+        color: #7985a7;
+      }
+
+      #memo-drop-zone .memo-drop-hint {
+        position: absolute;
+        top: -350px;
+        bottom: auto;
+        left: calc(50% + -10px);
+        transform: translateX(-50%);
+
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0px;
+
+        width: max-content;
+        max-width: 90%;
+        text-align: center;
+        pointer-events: none;
+        z-index: 5;
+      }
+
+      /* 모바일 */
+      @media (max-width: 660px) {
+        #memo-drop-zone .memo-drop-hint {
+          top: 12px;
+          width: 90vw;
+        }
+
+        #memo-drop-zone .book-guide-title {
+          font-size: 12px;
+        }
+        #memo-drop-zone .book-guide-desc {
+          margin: 0;
+          font-size: 10px;
+          font-weight: 400;
+          color: #a6aec3;
+        }
       }
     </style>
     <!-- Three.js 모듈: glass3d.js와 동일한 버전 사용 -->
@@ -1837,35 +2922,38 @@
             <div id="rear-deco-layer" aria-hidden="true"></div>
             <div id="front-photo-layer"></div>
           </div>
-          <div id="memo-drop-zone">
+          <div id="memo-drop-zone" aria-label="사진을 놓아 메모를 작성하는 책">
+            <div id="memo-book-desk" aria-hidden="true"></div>
             <div id="memo-book-3d" aria-hidden="true"></div>
-            <span class="memo-drop-hint"> 사진을 책 위에 놓아주세요 </span>
+
+            <div class="memo-drop-hint">
+              <span class="book-guide-eng">DRAG TO SAVE</span>
+              <p class="book-guide-title">사진을 책 위에 끌어 놓아보세요.</p>
+              <p class="book-guide-desc">
+                메모를 작성하고 앨범에 보관할 수 있어요.
+              </p>
+            </div>
+          </div>
+          <div id="shred-zone" aria-label="가위 사진 파기 구역">
+            <div class="shred-zone-content" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                width="72"
+                height="72"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="6" cy="6" r="3" />
+                <circle cx="6" cy="18" r="3" />
+                <path d="M8.1 8.1 20 20 M14.5 9.5 20 4 8.1 15.9" />
+              </svg>
+              <strong>CUT HERE</strong><span>사진을 놓으면 파기됩니다</span>
+            </div>
           </div>
           <div id="room-empty" hidden aria-hidden="true"></div>
-        </section>
-
-        <!-- 인화실 오른쪽: 가위 파기 구역 -->
-        <section id="shred-zone" aria-label="사진 파기 구역">
-          <div class="shred-zone-content">
-            <svg
-              viewBox="0 0 24 24"
-              width="78"
-              height="78"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="6" cy="6" r="3"></circle>
-              <circle cx="6" cy="18" r="3"></circle>
-              <path d="M8.1 8.1 20 20"></path>
-              <path d="M14.5 9.5 20 4 8.1 15.9"></path>
-            </svg>
-            <strong>CUT HERE</strong>
-            <span>사진을 놓으면 파기됩니다</span>
-          </div>
         </section>
       </div>
     </main>
@@ -1873,6 +2961,10 @@
       ↑ &nbsp; OPEN THE ARCHIVE / 보관함
     </button>
     <section id="archive-sheet" aria-label="나의 사진 앨범" aria-hidden="true">
+      <button id="archive-close" class="archive-close" type="button">
+        ↓ BACK TO MAIN / 메인으로
+      </button>
+
       <header class="archive-header">
         <button
           id="archive-grip"
@@ -1892,9 +2984,6 @@
             <input type="date" id="archive-date" aria-label="날짜로 검색" />
             <button id="archive-reset" type="button">초기화</button>
           </div>
-          <button id="archive-close" class="archive-close" type="button">
-            ✕ 닫기
-          </button>
         </div>
       </header>
       <div id="album-rail" class="archive-rail"></div>

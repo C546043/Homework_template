@@ -1,0 +1,112 @@
+function setupArchiveBatchDrag() {
+  const rail = $("album-rail");
+  if (!rail) return;
+
+  let session = null;
+  let ghost = null;
+
+  function trashContains(x, y) {
+    return batchMode && !$("archive-trash-zone").hidden && isInArchiveTrash(x, y);
+  }
+
+  function updateDrag(x, y) {
+    if (!ghost) return;
+    ghost.style.left = `${x}px`;
+    ghost.style.top = `${y}px`;
+    $("archive-trash-zone").classList.toggle("is-over", trashContains(x, y));
+  }
+
+  function createGhost(x, y) {
+    const chosen = selectedItems();
+    if (!chosen.length) return;
+
+    ghost = document.createElement("div");
+    ghost.className = "batch-drag-ghost";
+    ghost.setAttribute("aria-hidden", "true");
+
+    // 최대 3장만 겹쳐 보이지만, 실제로는 선택된 모든 사진이 이동함.
+    chosen.slice(0, 3).forEach((item, index) => {
+      const picture = document.createElement("div");
+      picture.className = "ghost-picture";
+      picture.style.setProperty("--angle", `${[-11, 0, 9][index]}deg`);
+      picture.style.setProperty("--shift-x", `${index * 7}px`);
+      picture.style.setProperty("--shift-y", `${index * 5}px`);
+      const img = new Image();
+      img.src = record("locker", item.key)?.image || "";
+      img.draggable = false;
+      picture.append(img);
+      ghost.append(picture);
+    });
+
+    const counter = document.createElement("span");
+    counter.className = "ghost-count";
+    counter.textContent = `${chosen.length}장`;
+    ghost.append(counter);
+    document.body.append(ghost);
+    document.body.classList.add("batch-dragging");
+    for (const card of visibleCards()) {
+      card.classList.toggle("is-drag-source", batchSelected.has(itemId("locker", card.dataset.key)));
+    }
+    updateDrag(x, y);
+  }
+
+  function clearDrag() {
+    ghost?.remove();
+    ghost = null;
+    document.body.classList.remove("batch-dragging");
+    $("archive-trash-zone").classList.remove("is-over");
+    for (const photo of rail.querySelectorAll(".album-photo.is-drag-source")) {
+      photo.classList.remove("is-drag-source");
+    }
+  }
+
+  rail.addEventListener("pointerdown", (event) => {
+    const photo = event.target instanceof Element
+      ? event.target.closest(".album-photo[data-key]") : null;
+    if (!photo || busy || (event.pointerType === "mouse" && event.button !== 0)) return;
+    session = {
+      pointerId: event.pointerId,
+      key: photo.dataset.key,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: false,
+    };
+  });
+
+  rail.addEventListener("pointermove", (event) => {
+    if (!session || session.pointerId !== event.pointerId || busy || !batchMode) return;
+    if (!batchSelected.has(itemId("locker", session.key))) return;
+
+    const moved = Math.hypot(event.clientX - session.startX, event.clientY - session.startY);
+    if (!session.dragging && moved > 10) {
+      session.dragging = true;
+      archiveDragSuppressUntil = performance.now() + 600;
+      try { rail.setPointerCapture(event.pointerId); } catch (_) {}
+      createGhost(event.clientX, event.clientY);
+    }
+    if (session.dragging) {
+      event.preventDefault();
+      updateDrag(event.clientX, event.clientY);
+    }
+  });
+
+  function finish(event) {
+    if (!session || session.pointerId !== event.pointerId) return;
+    const dropped = session.dragging && event.type === "pointerup" &&
+      trashContains(event.clientX, event.clientY);
+    const dragged = session.dragging;
+    session = null;
+    try {
+      if (rail.hasPointerCapture(event.pointerId)) rail.releasePointerCapture(event.pointerId);
+    } catch (_) {}
+    if (dragged) archiveDragSuppressUntil = performance.now() + 650;
+    clearDrag();
+    if (dropped) void deleteArchiveSelectionAt(event.clientX, event.clientY);
+  }
+  rail.addEventListener("pointerup", finish);
+  rail.addEventListener("pointercancel", finish);
+  window.addEventListener("blur", () => {
+    session = null;
+    clearDrag();
+  });
+}

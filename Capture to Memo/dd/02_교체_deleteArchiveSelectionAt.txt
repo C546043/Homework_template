@@ -1,0 +1,45 @@
+async function deleteArchiveSelectionAt(x, y) {
+  const chosen = selectedItems();
+  if (!chosen.length || busy) return;
+  busy = true;
+  refreshBatch();
+
+  const keys = new Set(chosen.map(item => item.key));
+  const nodes = visibleCards().filter(photo => keys.has(photo.dataset.key));
+
+  // 인화실과 동일한 흰색 삼각형 파기 이펙트.
+  // 여러 장일 때는 2~3번 겹쳐 퍼지도록 하되 과도한 연산은 막음.
+  const bursts = Math.min(3, chosen.length);
+  for (let i = 0; i < bursts; i++) {
+    playDarkroomShredEffect(x + (i - (bursts - 1) / 2) * 35, y - i * 12);
+  }
+  for (const node of nodes) {
+    node.style.pointerEvents = "none";
+    node.animate([
+      { opacity: 1, filter: "blur(0px)", transform: getComputedStyle(node).transform },
+      { opacity: 0, filter: "blur(5px)", transform: "translateY(14px) rotate(9deg) scale(.72)" }
+    ], { duration: 900, easing: "ease-out", fill: "forwards" });
+  }
+
+  // 이펙트를 보여준 다음 Firebase의 선택한 사진을 삭제.
+  await new Promise(resolve => setTimeout(resolve, 950));
+  const results = await Promise.allSettled(
+    chosen.map(item => db.ref("saved_memos").child(item.key).remove())
+  );
+  let removed = 0;
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      removed++;
+      batchSelected.delete(itemId("locker", chosen[index].key));
+    } else {
+      console.error("앨범 사진 파기 실패:", chosen[index].key, result.reason);
+    }
+  });
+  busy = false;
+  drawAlbums();
+  if (!batchSelected.size) leaveBatch();
+  else refreshBatch();
+  toast(removed === chosen.length
+    ? `${removed}장의 사진을 파기했어요.`
+    : `${removed}장 삭제, ${chosen.length - removed}장 실패. 다시 시도해 주세요.`);
+}
