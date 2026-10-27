@@ -743,7 +743,7 @@ body.archive-open #archive-sheet {
   flex: 0 0 min(820px, 82vw);
   min-width: 0;
   padding: 12px 10px 28px;
-  cursor: pointer;
+  cursor: default;
   transform: rotate(var(--album-angle)) rotateX(2deg);
   transform-origin: center;
   transition: transform 0.25s ease;
@@ -2574,4 +2574,86 @@ body.batch-mode #batch-bar {
 }
 body.batch-mode #archive-trash-zone {
   display: block;
+}
+
+/* ==========================================
+   //ARCHIVE - 책 터치 방지
+========================================== */
+
+/* 책 자체는 터치 및 선택 불가 */
+#album-rail .album-card,
+#album-rail .album-spread,
+#album-rail .album-page,
+#album-rail .album-grid,
+#album-rail .page-date,
+#album-rail .album-caption {
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 폴라로이드 사진은 기존처럼 터치 가능 */
+#album-rail .album-photo {
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 선택 모드에서는 사진 드래그 우선 */
+body.batch-mode #album-rail .album-photo {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* 보관함 사용 안내 */
+#archive-sheet .archive-guide {
+  position: absolute;
+  z-index: 12;
+  top: 24px;
+  left: 32px;
+  transform: none;
+
+  width: auto;
+  max-width: calc(100% - 64px);
+  text-align: left;
+  pointer-events: none;
+}
+
+#archive-sheet .archive-guide p {
+  margin: 0;
+  color: #8c98b5;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.archive-guide p {
+  margin: 0;
+  color: #7a86ab;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 사진 선택 모드에서는 안내 숨기기 */
+body.batch-mode #archive-sheet .archive-guide {
+  display: none;
+}
+
+/* 모바일 화면 */
+@media (max-width: 660px) {
+  #archive-sheet .archive-guide {
+    top: 61px;
+  }
+
+  .archive-guide p {
+    font-size: 10px;
+  }
+
+  .archive-guide small {
+    font-size: 9px;
+  }
 }
