@@ -7,9 +7,7 @@ const $ = (id) => document.getElementById(id);
 const db = window.db;
 const incoming = new Map();
 const saved = new Map();
-const albumClosed = new Set();
 const batchSelected = new Set();
-const SKIP_DELETE = "ctm-album-skip-delete-confirm";
 let room = "cover";
 let archiveOpen = false;
 let editorItem = null;
@@ -372,18 +370,14 @@ function setupSwipes() {
         return;
       }
       const touch = event.touches[0];
-
       verticalStart = {
         x: touch.clientX,
         y: touch.clientY,
         target: event.target,
         startedAt: performance.now(),
-
-        // 앨범 페이지를 읽기 위해 스크롤 중인지 기록
-        pageScrollTop:
-          event.target instanceof Element
-            ? event.target.closest(".album-page")?.scrollTop || 0
-            : 0,
+        pageScrollTop: event.target instanceof Element
+          ? (event.target.closest(".album-page")?.scrollTop || 0)
+          : 0,
       };
     },
     { capture: true, passive: true },
@@ -399,30 +393,14 @@ function setupSwipes() {
       const dx = touch.clientX - start.x;
       const dy = touch.clientY - start.y;
       if (Math.abs(dy) < 65 || Math.abs(dy) < Math.abs(dx) * 1.3) return;
-
       if (archiveOpen) {
-        const elapsed = performance.now() - start.startedAt;
-
-        const startedInArchive =
-          start.target instanceof Element &&
-          !!start.target.closest("#archive-sheet");
-
-        const onInput =
-          start.target instanceof Element &&
-          !!start.target.closest("input,textarea,select,[contenteditable]");
-
-        // 보관함에서 아래로 빠르게 스와이프
-        if (
-          startedInArchive &&
-          !onInput &&
-          !batchMode &&
-          !busy &&
-          dy > 105 &&
-          elapsed < 550 &&
-          dy > Math.abs(dx) * 1.3 &&
-          start.pageScrollTop < 3
-        ) {
-          setArchive(false);
+        const target = start.target instanceof Element ? start.target : null;
+        const isInput = target?.closest("input,textarea,select,[contenteditable]");
+        const isPhoto = target?.closest(".album-photo");
+        if (!batchMode && !isInput && !isPhoto && dy > 105 &&
+            performance.now() - start.startedAt < 550 &&
+            start.pageScrollTop < 3) {
+          setArchive(false); // keep previous horizontal location
         }
       } else if (dy < 0 && start.y > window.innerHeight * 0.62) {
         setArchive(true);
@@ -469,6 +447,7 @@ function setupArchiveRailDrag() {
     };
   });
   rail.addEventListener("pointermove", (event) => {
+    if (batchMode) { drag = null; return; }
     if (!drag || event.pointerId !== drag.id) return;
     const dx = event.clientX - drag.x;
     const dy = event.clientY - drag.y;
@@ -550,57 +529,53 @@ function installPhotoInteraction(el, source, key) {
   el.dataset.key = key;
   el.draggable = false;
   el.addEventListener("contextmenu", (e) => e.preventDefault());
-  let hold = null,
-    origin = null,
-    suppress = false;
-  el.addEventListener("pointerdown", (e) => {
-    if (busy || batchMode || (e.pointerType === "mouse" && e.button !== 0))
-      return;
-    origin = { x: e.clientX, y: e.clientY, id: e.pointerId };
-    suppress = false;
-    if (el.classList.contains("hanging-polaroid")) return;
-    hold = setTimeout(() => {
-      hold = null;
-      suppress = true;
+  const isAlbum = source === "locker" && el.classList.contains("album-photo");
+  let holdTimer = 0;
+  let point = null;
+  let ignoreNextClick = false;
+
+  el.addEventListener("pointerdown", (event) => {
+    if (busy || (event.pointerType === "mouse" && event.button !== 0)) return;
+    point = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    if (!isAlbum || batchMode) return;
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => {
+      holdTimer = 0;
+      ignoreNextClick = true;
       enterBatch(source, key);
-    }, 610);
+    }, 570);
   });
-  el.addEventListener("pointermove", (e) => {
-    if (
-      origin?.id === e.pointerId &&
-      Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > 11
-    ) {
-      clearTimeout(hold);
-      hold = null;
+  el.addEventListener("pointermove", (event) => {
+    if (point?.id === event.pointerId &&
+        Math.hypot(event.clientX - point.x, event.clientY - point.y) > 11) {
+      clearTimeout(holdTimer);
+      holdTimer = 0;
     }
   });
-  ["pointerup", "pointercancel", "pointerleave"].forEach((event) =>
-    el.addEventListener(event, () => {
-      clearTimeout(hold);
-      hold = null;
-    }),
-  );
-  el.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (suppress) {
-      suppress = false;
+  for (const name of ["pointerup", "pointercancel", "pointerleave"]) {
+    el.addEventListener(name, () => { clearTimeout(holdTimer); holdTimer = 0; });
+  }
+  el.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (ignoreNextClick || performance.now() < archiveDragSuppressUntil) {
+      ignoreNextClick = false;
       return;
     }
-    if (batchMode) {
+    if (batchMode && isAlbum) {
       toggleBatch(source, key);
       return;
     }
-    if (source === "incoming" && el.classList.contains("hanging-polaroid"))
-      return;
+    if (batchMode || source === "incoming" && el.classList.contains("hanging-polaroid")) return;
     openEditor(source, key);
   });
   const check = document.createElement("span");
   check.className = "selection-check";
   check.textContent = "✓";
   check.setAttribute("aria-hidden", "true");
-  el.appendChild(check);
+  el.append(check);
 }
+
 /* ============================================================
    DARKROOM WIRE PHYSICS — actual Firebase data and Matter.js
    No artificial incomingPhotos/newItem/openMemoEditor functions.
@@ -725,6 +700,9 @@ function createDarkroomHanger(key, data, t) {
     freeX: 0,
     freeY: 0,
     deleting: false,
+    lane: 0,
+    targetLane: 0,
+    laneFade: null,
   };
   card.style.visibility = "hidden";
   darkroomPhysics.items.set(key, hanger);
@@ -757,12 +735,55 @@ function incomingChronologicalRows() {
     });
 }
 
+// ===========================================================
+// CTM: 인화실 초과 사진용 뒷줄 (기존 데이터/드래그/저장 유지)
+// 앞줄은 현재 간격을 유지하고, 초과 사진만 뒷줄로 보냅니다.
+// ===========================================================
+function getOverflowWirePoint(t) {
+  const w = darkroomPhysics.width || $("darkroom-scene")?.clientWidth || 900;
+  const h = darkroomPhysics.height || $("darkroom-scene")?.clientHeight || 700;
+  return {
+    x: (2 * t - 1) * w,
+    // 앞줄(왼→오 내리막)과 다른 기울기: 왼→오 오르막
+    y: (0.47 - 0.28 * t) * h,
+  };
+}
+
+function getDarkroomHangerPoint(h) {
+  return h.lane === 1
+    ? getOverflowWirePoint(h.t)
+    : getDarkroomWirePoint(h.t);
+}
+
+function updateOverflowWire(show, minT, maxT) {
+  const svg = $("world-wire-overlay");
+  if (!svg) return;
+  let path = $("overflow-wire");
+  if (!path) {
+    path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.id = "overflow-wire";
+    path.setAttribute("fill", "none");
+    // 실제 앞줄보다 먼저 그림: 앞줄이 더 또렷하게 보입니다.
+    svg.insertBefore(path, $("front-wire") || null);
+  }
+  const w = darkroomPhysics.width || 900;
+  const h = darkroomPhysics.height || 700;
+  const a = Math.max(0.5, minT - 0.035);
+  const b = Math.min(0.995, maxT + 0.035);
+  path.setAttribute(
+    "d",
+    `M ${(2 * a * w).toFixed(1)} ${((0.47 - 0.28 * a) * h).toFixed(1)}` +
+    ` L ${(2 * b * w).toFixed(1)} ${((0.47 - 0.28 * b) * h).toFixed(1)}`,
+  );
+  path.classList.toggle("is-visible", Boolean(show));
+}
+
 function distributeDarkroomHangers(all = incomingChronologicalRows()) {
   const attached = all.filter((row) => {
     const h = darkroomPhysics.items.get(row.key);
     return h && !h.detached && !h.deleting;
   });
-  if (!attached.length) return;
+
   const width = Math.max(
     1,
     darkroomPhysics.width || $("darkroom-scene")?.clientWidth || 900,
@@ -776,15 +797,49 @@ function distributeDarkroomHangers(all = incomingChronologicalRows()) {
   const minT = 0.5 + (widest / 2 + 35) / (2 * width);
   const maxT = Math.max(minT, 1 - (shredW + safeGap) / (2 * width));
   const preferredStep = (widest + 25) / (2 * width);
-  const step =
-    attached.length > 1
-      ? Math.min(preferredStep, (maxT - minT) / (attached.length - 1))
-      : 0;
-  // oldest on right, newest on left. Removed card does not occupy a slot.
+
+  // 앞줄 사진이 서로 겹치지 않고 들어가는 최대 수량.
+  const capacity = Math.max(
+    1,
+    Math.floor((maxT - minT) / preferredStep + 0.00001) + 1,
+  );
+  const frontCount = Math.min(capacity, attached.length);
+  const backCount = attached.length - frontCount;
+
+  // 이전 규칙 유지: 오래된 사진은 오른쪽, 새 사진은 왼쪽.
+  // 앞줄 자리가 나면 가장 오래된 뒷줄 사진부터 앞줄로 이동.
   attached.forEach((row, i) => {
     const h = darkroomPhysics.items.get(row.key);
-    h.targetT = maxT - i * step;
+    const desiredLane = i < frontCount ? 0 : 1;
+    const laneIndex = desiredLane === 0 ? i : i - frontCount;
+    const laneSize = desiredLane === 0 ? frontCount : backCount;
+    const step = laneSize > 1
+      ? Math.min(preferredStep, (maxT - minT) / (laneSize - 1))
+      : 0;
+
+    h.targetT = maxT - laneIndex * step;
+    h.targetLane = desiredLane;
+
+    // 아직 등장 중인 사진은 실제 화면에 나타나기 전에 줄을 선택.
+    if (!h.landed && !h.detached) {
+      h.lane = desiredLane;
+      h.laneFade = null;
+    } else if (!h.detached && !h.returning && h.lane !== desiredLane) {
+      if (!h.laneFade || h.laneFade.to !== desiredLane) {
+        h.laneFade = {
+          to: desiredLane,
+          phase: "out",
+          started: performance.now(),
+        };
+      }
+    } else if (!h.detached && !h.returning && h.lane === desiredLane) {
+      // 이동 중 다시 같은 줄이 목표가 되었다면 이전 전환 취소.
+      h.laneFade = null;
+    }
   });
+
+  // 뒷줄에 실제 사진이 있을 때만 선 표시. 비면 CSS로 페이드아웃.
+  updateOverflowWire(backCount > 0, minT, maxT);
 }
 
 function reflowAttachedDarkroomPhotos() {
@@ -1068,7 +1123,7 @@ function enableDarkroomPhotoDrag(card, key) {
         drag.dy = Math.max(-230, Math.min(230, dy));
       }
       if (Math.hypot(dx, dy) >= 130) {
-        const p = getDarkroomWirePoint(h.t);
+        const p = getDarkroomHangerPoint(h);
         h.detached = true;
         // Keep the release at the previous elastic position: no sudden jump.
         const o = darkroomDragOffset(h.t);
@@ -1162,14 +1217,16 @@ function animateDarkroomLines(now) {
   darkroomPhysics.lastTime = now;
   tickDarkroomPhotoDrag(dt);
   const RIDE_DURATION = 2800;
+
   for (const h of darkroomPhysics.items.values()) {
     if (!darkroomPhysics.revealStarted || now < h.spawnAt) {
       h.el.style.visibility = "hidden";
       continue;
     }
-    // 0.32 starts under the 3D cover book; first visible part is after book edge.
     const elapsed = Math.max(0, now - h.spawnAt);
     const u = Math.min(1, elapsed / RIDE_DURATION);
+
+    // 기존 짚라인 등장, 감속, 진자 운동은 유지.
     if (darkroomPhysics.reduced) {
       h.t = h.targetT;
       h.landed = true;
@@ -1183,8 +1240,6 @@ function animateDarkroomLines(now) {
       if (u >= 1) {
         h.t = h.targetT;
         h.landed = true;
-        h.swing = 0;
-        h.swingV = 0;
       }
     } else if (h.landed && !h.detached && !h.returning) {
       const force = -115 * Math.sin(h.swing) - 8.5 * h.swingV;
@@ -1196,13 +1251,43 @@ function animateDarkroomLines(now) {
         h.swingV = 0;
       }
     }
+
     if (!h.detached && !h.returning && h.landed && Number.isFinite(h.targetT)) {
       const follow = 1 - Math.exp(-8 * dt);
       h.t += (h.targetT - h.t) * follow;
       if (Math.abs(h.targetT - h.t) < 0.00025) h.t = h.targetT;
     }
-    const p = getDarkroomWirePoint(h.t);
-    const o = darkroomDragOffset(h.t);
+
+    // 앞/뒷줄을 바꿀 때: 0.24초 사라짐 → 줄 이동 → 0.32초 나타남.
+    // DOM을 새로 만들지 않아 클릭/드래그/원본 사진 데이터는 유지됨.
+    let switchOpacity = 1;
+    if (h.laneFade && !h.detached && !h.returning) {
+      const change = h.laneFade;
+      if (change.phase === "out") {
+        const a = Math.min(1, (now - change.started) / 240);
+        switchOpacity = 1 - a;
+        if (a >= 1) {
+          h.lane = change.to;
+          h.t = h.targetT;
+          h.swing = 0;
+          h.swingV = 0;
+          change.phase = "in";
+          change.started = now;
+          switchOpacity = 0;
+        }
+      } else {
+        const a = Math.min(1, (now - change.started) / 320);
+        switchOpacity = a;
+        if (a >= 1) h.laneFade = null;
+      }
+    } else if (!h.returning && !h.detached && h.lane !== h.targetLane) {
+      h.laneFade = { to: h.targetLane, phase: "out", started: now };
+    }
+
+    const p = getDarkroomHangerPoint(h);
+    // 기존 앞줄의 늘어나는 실 계산을 유지.
+    const o = h.lane === 0 ? darkroomDragOffset(h.t) : { x: 0, y: 0 };
+
     if (h.returning) {
       const q = Math.min(1, Math.max(0, (now - h.returning.start) / 460));
       const ease = 1 - Math.pow(1 - q, 3);
@@ -1220,19 +1305,24 @@ function animateDarkroomLines(now) {
       h.el.style.left = `${p.x + o.x}px`;
       h.el.style.top = `${p.y + o.y}px`;
       h.el.style.transform = `translateX(-50%) rotate(${h.swing}rad)`;
-      h.el.style.zIndex = String(5 + Math.round(h.targetT * 100));
+      // 뒷줄은 앞줄보다 뒤에 보이도록 쌓임 순서 변경.
+      h.el.style.zIndex = h.lane === 1 ? "2" : String(5 + Math.round(h.targetT * 100));
     }
-    // Card is behind the cover's 3D book during the initial section.
-    // Alpha ramps up as it reaches the far edge of that book, with no teleport.
+
+    h.el.classList.toggle("is-overflow", h.lane === 1 && !h.detached);
+    // 짚라인에서 서서히 등장 + 뒷줄의 연한 투명도 + 줄 이동 페이드.
     const appear = Math.max(0, Math.min(1, (h.t - 0.41) / 0.13));
-    h.el.style.opacity =
-      h.detached || h.returning || h.landed ? "1" : String(appear);
+    const baseOpacity = h.lane === 1 ? 0.46 : 1;
+    h.el.style.opacity = String(
+      (h.detached || h.returning ? 1 : (h.landed ? 1 : appear) * baseOpacity) *
+      switchOpacity,
+    );
     h.el.style.visibility = "visible";
+
     if (
       darkroomPhysics.photoDrag?.active &&
       Math.abs(darkroomPhysics.photoDrag.t - h.t) < 0.001
-    )
-      h.el.style.zIndex = "500";
+    ) h.el.style.zIndex = "500";
   }
   renderDarkroomBendingWire();
 }
@@ -1264,46 +1354,32 @@ function filteredSaved() {
     .sort((a, b) => b.t - a.t);
 }
 function createAlbumPhoto(row) {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "album-photo";
-  btn.dataset.title = String(row.data.labelTxt || "").trim() || "제목 없음";
-  btn.title = row.data.labelTxt || row.day;
-
-  // 사진마다 일정하지만 서로 다른 기울기
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = "album-photo";
+  card.dataset.title = String(row.data.labelTxt || "").trim() || "제목 없음";
+  card.title = row.data.labelTxt || row.day;
   const angles = [-3, 2, -1.8, 3.4, 1.2, -2.5, 2.8, -1];
-  const hash = [...String(row.key)].reduce(
-    (sum, ch) => sum + ch.charCodeAt(0),
-    0,
-  );
-  btn.style.setProperty("--photo-angle", `${angles[hash % angles.length]}deg`);
-
+  const hash = [...String(row.key)].reduce((n,ch) => n + ch.charCodeAt(0), 0);
+  card.style.setProperty("--photo-angle", `${angles[hash % angles.length]}deg`);
   const img = new Image();
   img.src = row.data.image;
-  img.alt = row.data.labelTxt || "저장된 사진";
+  img.alt = row.data.labelTxt || "보관한 사진";
   img.loading = "lazy";
   img.draggable = false;
-
-  btn.append(img);
-  installPhotoInteraction(btn, "locker", row.key);
-  return btn;
+  card.append(img);
+  installPhotoInteraction(card, "locker", row.key);
+  return card;
 }
 
-function createPage(pageDays, rows) {
+function createPage(dates, rows) {
   const page = document.createElement("div");
   page.className = "album-page";
-
-  const dates = Array.isArray(pageDays) ? pageDays : [pageDays].filter(Boolean);
-
   const heading = document.createElement("p");
   heading.className = "page-date";
-
-  heading.textContent = dates.length
-    ? `${dates.map(relativeDay).join(" · ")}  /  ${rows.length} PHOTOS`
-    : "BLANK PAGE";
-
+  const labels = dates.map(relativeDay).join(" · ");
+  heading.textContent = dates.length ? `${labels} / ${rows.length} PHOTOS` : "BLANK PAGE";
   page.append(heading);
-
   if (!rows.length) {
     const empty = document.createElement("p");
     empty.className = "page-empty";
@@ -1311,148 +1387,74 @@ function createPage(pageDays, rows) {
     page.append(empty);
     return page;
   }
-
   const grid = document.createElement("div");
   grid.className = "album-grid";
-
-  rows.forEach((row) => {
-    grid.appendChild(createAlbumPhoto(row));
-  });
-
-  page.appendChild(grid);
+  for (const row of rows) grid.append(createAlbumPhoto(row));
+  page.append(grid);
   return page;
 }
 
 function drawAlbums() {
   const rail = $("album-rail");
   if (!rail) return;
-
-  const previousScroll = rail.scrollLeft;
-  rail.replaceChildren();
-
+  const scroll = rail.scrollLeft;
   const rows = filteredSaved();
-
+  rail.replaceChildren();
   if (!rows.length) {
     const empty = document.createElement("div");
     empty.className = "archive-empty";
-    empty.textContent =
-      "아직 펼칠 앨범이 없어요. 인화실에서 사진을 저장해 보세요.";
+    empty.textContent = "아직 펼칠 앨범이 없어요. 인화실에서 사진을 저장해 보세요.";
     rail.append(empty);
+    refreshBatch();
     return;
   }
-
-  // 1. 날짜별 사진 분류
   const days = new Map();
-
   for (const row of rows) {
-    if (!days.has(row.day)) {
-      days.set(row.day, []);
-    }
+    if (!days.has(row.day)) days.set(row.day, []);
     days.get(row.day).push(row);
   }
-
   const dates = [...days.keys()].sort().reverse();
-
-  // 2. 사진 1~2장인 날은 최대 3일 묶기
   const pages = [];
-  let group = [];
-
-  const flushGroup = () => {
-    if (!group.length) return;
-
-    pages.push({
-      dates: [...group],
-      photos: group.flatMap((day) => days.get(day)),
-    });
-
-    group = [];
-  };
-
+  let pending = [];
+  function flush() {
+    if (!pending.length) return;
+    pages.push({dates: pending.slice(), photos: pending.flatMap(day => days.get(day))});
+    pending = [];
+  }
   for (const day of dates) {
     if (days.get(day).length >= 3) {
-      // 하루 3장 이상이면 독립된 페이지
-      flushGroup();
-
-      pages.push({
-        dates: [day],
-        photos: days.get(day),
-      });
+      flush();
+      pages.push({dates:[day], photos:days.get(day)});
     } else {
-      // 하루 1~2장이면 함께 묶기
-      group.push(day);
-
-      if (group.length === 3) {
-        flushGroup();
-      }
+      pending.push(day);
+      if (pending.length === 3) flush();
     }
   }
-
-  flushGroup();
-
-  // 3. 한 권에 두 페이지
-  const covers = [
-    { color: "#b9ccef", ink: "#20345d", dark: false },
-    { color: "#e2c8b0", ink: "#4d392c", dark: false },
-    { color: "#27343f", ink: "#f4f5f0", dark: true },
-    { color: "#b8cdbf", ink: "#284637", dark: false },
-    { color: "#e5b8bf", ink: "#5f3545", dark: false },
-    { color: "#c5badc", ink: "#473962", dark: false },
-  ];
-
-  const rotations = [-4.2, 3.3, -2.4, 4.5, -3.5, 2.1];
-
+  flush();
+  const covers = ["#b9ccef","#e2c8b0","#b8cdbf","#e5b8bf","#c5badc"];
+  const rotations = [-4.2,3.3,-2.4,4.5,-3.5,2.1];
   for (let i = 0; i < pages.length; i += 2) {
-    const albumIndex = i / 2;
-
-    const first = pages[i];
-    const second = pages[i + 1] || {
-      dates: [],
-      photos: [],
-    };
-
-    const allDates = [...first.dates, ...second.dates];
-    const newest = allDates[0];
-    const oldest = allDates[allDates.length - 1];
-
-    const style = covers[albumIndex % covers.length];
-
+    const a = pages[i];
+    const b = pages[i + 1] || {dates:[],photos:[]};
+    const index = i / 2;
+    const all = [...a.dates,...b.dates];
+    const newest = all[0] || "";
+    const oldest = all[all.length - 1] || newest;
     const card = document.createElement("article");
     card.className = "album-card";
-
-    card.dataset.album = `${newest}|${oldest}`;
-    card.dataset.dark = String(style.dark);
-
-    card.style.setProperty("--album-color", style.color);
-    card.style.setProperty("--album-ink", style.ink);
-
-    card.style.setProperty(
-      "--album-angle",
-      `${rotations[albumIndex % rotations.length]}deg`,
-    );
-
+    card.style.setProperty("--album-color", covers[index % covers.length]);
+    card.style.setProperty("--album-angle", `${rotations[index % rotations.length]}deg`);
     const spread = document.createElement("div");
     spread.className = "album-spread";
-
-    spread.append(
-      createPage(first.dates, first.photos),
-      createPage(second.dates, second.photos),
-    );
-
+    spread.append(createPage(a.dates,a.photos), createPage(b.dates,b.photos));
     const caption = document.createElement("div");
     caption.className = "album-caption";
-
-    const info = document.createElement("span");
-    info.textContent = `ALBUM ${String(albumIndex + 1).padStart(2, "0")} / ${oldest} — ${newest}`;
-
-    caption.append(info);
-
-    // 책 닫기 이벤트와 닫힌 표지는 만들지 않음
-    card.append(spread, caption);
+    caption.textContent = `ALBUM ${String(index + 1).padStart(2,"0")} / ${oldest} — ${newest}`;
+    card.append(spread,caption);
     rail.append(card);
   }
-
-  // 사진 저장 후 다시 그려도 현재 앨범 스크롤 유지
-  rail.scrollLeft = previousScroll;
+  rail.scrollLeft = scroll;
+  refreshBatch();
 }
 
 // -------------------------------------------------------------------
@@ -1823,184 +1825,8 @@ function cleanRich(html) {
     ],
   });
 }
-function focusSavedRange(editor) {
-  const sel = window.getSelection();
-  if (!sel) return;
-  if (
-    lastSelectedRange &&
-    editor.contains(lastSelectedRange.commonAncestorContainer)
-  ) {
-    try {
-      sel.removeAllRanges();
-      sel.addRange(lastSelectedRange);
-    } catch {}
-  } else {
-    editor.focus();
-  }
-}
-function formatSelection(editor, prop, value) {
-  const sel = window.getSelection();
-  let range = lastSelectedRange?.cloneRange();
-  if (sel?.rangeCount) {
-    const current = sel.getRangeAt(0);
-    if (editor.contains(current.commonAncestorContainer) && !current.collapsed)
-      range = current.cloneRange();
-  }
-  if (
-    !range ||
-    range.collapsed ||
-    !editor.contains(range.commonAncestorContainer)
-  ) {
-    toast("꾸밀 글자를 먼저 선택해 주세요.");
-    return;
-  }
-  try {
-    const node = document.createElement("span");
-    node.style[prop] = value;
-    node.append(range.extractContents());
-    range.insertNode(node);
-    const r = document.createRange();
-    r.selectNodeContents(node);
-    lastSelectedRange = r.cloneRange();
-    sel.removeAllRanges();
-    sel.addRange(r);
-  } catch (e) {
-    console.error(e);
-    toast("선택한 글자를 다시 지정해 주세요.");
-  }
-}
-function checkboxOnCurrentLine(editor) {
-  const sel = window.getSelection();
-  let range = lastSelectedRange?.cloneRange();
-  if (sel?.rangeCount) {
-    const r = sel.getRangeAt(0);
-    if (editor.contains(r.startContainer)) range = r.cloneRange();
-  }
-  let node = range?.startContainer || editor.lastChild;
-  if (node?.nodeType === Node.TEXT_NODE) node = node.parentNode;
-  while (node && node !== editor && !/^(DIV|P|LI)$/.test(node.nodeName))
-    node = node.parentNode;
-  if (!node || node === editor) {
-    // 직접 입력한 텍스트가 root에 붙어 있는 경우 그 줄 하나만 감싼다.
-    const block = document.createElement("div");
-    const child = range?.startContainer;
-    if (child?.nodeType === Node.TEXT_NODE && child.parentNode === editor) {
-      editor.insertBefore(block, child);
-      block.appendChild(child);
-    } else {
-      block.append(document.createElement("br"));
-      editor.append(block);
-    }
-    node = block;
-  }
-  if (node.classList?.contains("memo-task")) return;
-  const task = document.createElement("div");
-  task.className = "memo-task";
-  task.contentEditable = "false";
-  const check = document.createElement("input");
-  check.type = "checkbox";
-  check.setAttribute("contenteditable", "false");
-  const span = document.createElement("span");
-  span.contentEditable = "true";
-  while (node.firstChild) span.append(node.firstChild);
-  if (!span.hasChildNodes()) span.append(document.createElement("br"));
-  task.append(check, span);
-  node.replaceWith(task);
-  const r = document.createRange();
-  r.selectNodeContents(span);
-  r.collapse(false);
-  lastSelectedRange = r.cloneRange();
-  // 체크박스를 만들 때는 키보드를 강제로 열지 않음.
-}
-function editToolbar(editor) {
-  const bar = document.createElement("div");
-  bar.className = "format-tools";
-  const definitions = [
-    ["B", "bold"],
-    ["매우 크게", "32"],
-    ["크게", "24"],
-    ["중간", "16"],
-    ["작게", "12"],
-    ["• 목록", "ul"],
-    ["1. 목록", "ol"],
-    ["☐ 체크", "check"],
-  ];
-  for (const [label, command] of definitions) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.textContent = label;
-    btn.dataset.cmd = command;
-    bar.append(btn);
-  }
-  for (const color of ["#e74d4d", "#f09537", "#368a54", "#3977db", "#9254ce"]) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.dataset.color = color;
-    btn.style.setProperty("--tone", color);
-    btn.title = "글씨 색상";
-    btn.setAttribute("aria-label", color);
-    bar.append(btn);
-  }
-  bar.addEventListener(
-    "pointerdown",
-    () => {
-      const s = window.getSelection();
-      if (
-        s?.rangeCount &&
-        editor.contains(s.getRangeAt(0).commonAncestorContainer)
-      )
-        lastSelectedRange = s.getRangeAt(0).cloneRange();
-    },
-    true,
-  );
-  bar.addEventListener("mousedown", (e) => {
-    if (e.target.closest("button")) e.preventDefault();
-  });
-  bar.addEventListener("click", (e) => {
-    const btn = e.target.closest("button");
-    if (!btn) return;
-    if (btn.dataset.color) formatSelection(editor, "color", btn.dataset.color);
-    else if (btn.dataset.cmd === "bold")
-      formatSelection(editor, "fontWeight", "bold");
-    else if (/^\d+$/.test(btn.dataset.cmd))
-      formatSelection(editor, "fontSize", btn.dataset.cmd + "px");
-    else if (btn.dataset.cmd === "check") checkboxOnCurrentLine(editor);
-    else {
-      focusSavedRange(editor);
-      document.execCommand(
-        btn.dataset.cmd === "ul" ? "insertUnorderedList" : "insertOrderedList",
-        false,
-        null,
-      );
-    }
-  });
-  return bar;
-}
-function makeField(label, initial = "") {
-  const field = document.createElement("div");
-  field.className = "field";
-  const lab = document.createElement("label");
-  lab.textContent = label;
-  const input = document.createElement("input");
-  input.type = "text";
-  input.value = initial;
-  field.append(lab, input);
-  return { field, input };
-}
-/* =====================================================
-   EDITOR INK — 펜 버튼 + 사진/글 위 드로잉 + 저장
-   sketch.js에서 function openEditor(...) 바로 위에 붙여넣기
-   ===================================================== */
 
-/* ================================================================
-   EDITOR INK v3 — memo 글 위에서 선 끊김 방지 / 버튼 클릭 우선
-   sketch.js: 기존 setupEditorInk(...) 함수 전체와 교체
-   ================================================================ */
-/* =====================================================================
-   CTM EDITOR INK v5 — 펜 + 획 전체 지우개 / 태블릿 지원
-   sketch.js에서 기존 setupEditorInk({ layer, box, polaroid, data }) 함수
-   처음부터 끝까지 아래 함수 하나로 교체하세요.
-   ===================================================================== */
+
 function setupEditorInk({ layer, box, polaroid, data }) {
   const NS = "http://www.w3.org/2000/svg";
   const ink = document.createElementNS(NS, "svg");
@@ -2043,25 +1869,16 @@ function setupEditorInk({ layer, box, polaroid, data }) {
   // Firebase memoInk: 기존 선 데이터 형식 [ [ [x,y], ... ], ... ] 유지
   // x,y는 팝업 내부 0~1 상대 좌표이며, 밖으로 나온 사진에서는 범위를 벗어날 수 있음.
   let strokes = Array.isArray(data.memoInk)
-    ? data.memoInk
-        .slice(0, 900)
+    ? data.memoInk.slice(0, 900)
         .filter(Array.isArray)
-        .map((points) =>
-          points
-            .slice(0, 1800)
-            .filter(
-              (p) =>
-                Array.isArray(p) &&
-                p.length >= 2 &&
-                Number.isFinite(Number(p[0])) &&
-                Number.isFinite(Number(p[1])),
-            )
-            .map((p) => [Number(p[0]), Number(p[1])]),
-        )
-        .filter((points) => points.length > 0)
+        .map(points => points.slice(0, 1800)
+          .filter(p => Array.isArray(p) && p.length >= 2 &&
+            Number.isFinite(Number(p[0])) && Number.isFinite(Number(p[1])))
+          .map(p => [Number(p[0]), Number(p[1])]))
+        .filter(points => points.length > 0)
     : [];
 
-  let mode = "none"; // none / pen / eraser
+  let mode = "none";  // none / pen / eraser
   let pointerId = null;
   let currentStroke = null;
   let currentPath = null;
@@ -2069,51 +1886,40 @@ function setupEditorInk({ layer, box, polaroid, data }) {
   let disposed = false;
   const ERASER_RADIUS_PX = 22; // 닿은 획 전체를 삭제하는 지우개 반경
 
-  function rect() {
-    return box.getBoundingClientRect();
-  }
+  function rect() { return box.getBoundingClientRect(); }
 
   function point(clientX, clientY) {
     const r = rect();
     return [
-      Math.round(((clientX - r.left) / Math.max(1, r.width)) * 10000) / 10000,
-      Math.round(((clientY - r.top) / Math.max(1, r.height)) * 10000) / 10000,
+      Math.round((clientX - r.left) / Math.max(1, r.width) * 10000) / 10000,
+      Math.round((clientY - r.top) / Math.max(1, r.height) * 10000) / 10000
     ];
   }
 
   function isInside(x, y) {
-    return [box, polaroid].some((el) => {
+    return [box, polaroid].some(el => {
       const r = el.getBoundingClientRect();
       return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
     });
   }
 
   function validPosition(e) {
-    return (
-      Number.isFinite(e.clientX) &&
-      Number.isFinite(e.clientY) &&
-      !(e.clientX === 0 && e.clientY === 0) &&
-      isInside(e.clientX, e.clientY)
-    );
+    return Number.isFinite(e.clientX) && Number.isFinite(e.clientY) &&
+      !(e.clientX === 0 && e.clientY === 0) && isInside(e.clientX, e.clientY);
   }
 
   // 모든 중요한 버튼은 펜/지우개보다 우선 처리
   function isControl(target) {
-    return (
-      target instanceof Element &&
-      !!target.closest(
-        ".editor-pen-toggle, .editor-eraser-toggle, " +
-          ".editor-close, .editor-actions button, .editor-btn",
-      )
+    return target instanceof Element && !!target.closest(
+      ".editor-pen-toggle, .editor-eraser-toggle, " +
+      ".editor-close, .editor-actions button, .editor-btn"
     );
   }
 
   function redrawPath(path, points) {
     if (!path || !points.length) return;
-    const d = points.map(
-      (p, i) =>
-        `${i ? "L" : "M"}${(p[0] * 1000).toFixed(2)} ${(p[1] * 1000).toFixed(2)}`,
-    );
+    const d = points.map((p, i) =>
+      `${i ? "L" : "M"}${(p[0] * 1000).toFixed(2)} ${(p[1] * 1000).toFixed(2)}`);
     if (points.length === 1) d.push("l 0.05 0.05");
     path.setAttribute("d", d.join(" "));
   }
@@ -2134,11 +1940,8 @@ function setupEditorInk({ layer, box, polaroid, data }) {
   function endGesture() {
     if (pointerId !== null) {
       try {
-        if (ink.hasPointerCapture(pointerId))
-          ink.releasePointerCapture(pointerId);
-      } catch (_) {
-        /* capture가 다른 요소에 걸려있어도 무시 */
-      }
+        if (ink.hasPointerCapture(pointerId)) ink.releasePointerCapture(pointerId);
+      } catch (_) { /* capture가 다른 요소에 걸려있어도 무시 */ }
     }
     pointerId = null;
     currentStroke = null;
@@ -2157,10 +1960,7 @@ function setupEditorInk({ layer, box, polaroid, data }) {
     pen.setAttribute("aria-pressed", String(mode === "pen"));
     eraser.setAttribute("aria-pressed", String(mode === "eraser"));
     pen.setAttribute("aria-label", mode === "pen" ? "펜 끄기" : "펜 켜기");
-    eraser.setAttribute(
-      "aria-label",
-      mode === "eraser" ? "지우개 끄기" : "지우개 켜기",
-    );
+    eraser.setAttribute("aria-label", mode === "eraser" ? "지우개 끄기" : "지우개 켜기");
     pen.title = mode === "pen" ? "펜 끄기" : "펜 켜기";
     eraser.title = mode === "eraser" ? "지우개 끄기" : "지우개 켜기";
 
@@ -2174,15 +1974,11 @@ function setupEditorInk({ layer, box, polaroid, data }) {
 
   // 점 P와 선분 AB 사이의 픽셀 거리 제곱
   function distanceSquaredToSegment(px, py, ax, ay, bx, by) {
-    const dx = bx - ax,
-      dy = by - ay;
+    const dx = bx - ax, dy = by - ay;
     const len2 = dx * dx + dy * dy;
-    const t =
-      len2 < 0.000001
-        ? 0
-        : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
-    const x = ax + t * dx - px,
-      y = ay + t * dy - py;
+    const t = len2 < 0.000001 ? 0 : Math.max(0, Math.min(1,
+      ((px - ax) * dx + (py - ay) * dy) / len2));
+    const x = ax + t * dx - px, y = ay + t * dy - py;
     return x * x + y * y;
   }
 
@@ -2190,12 +1986,9 @@ function setupEditorInk({ layer, box, polaroid, data }) {
   // 선분 대 선분 충돌만 검사하고, 삭제가 발생할 때만 SVG를 다시 그림.
   function eraseBetween(from, to) {
     const r = rect();
-    const w = Math.max(1, r.width),
-      h = Math.max(1, r.height);
-    const ax = from[0] * w,
-      ay = from[1] * h;
-    const bx = to[0] * w,
-      by = to[1] * h;
+    const w = Math.max(1, r.width), h = Math.max(1, r.height);
+    const ax = from[0] * w, ay = from[1] * h;
+    const bx = to[0] * w, by = to[1] * h;
     const radius2 = ERASER_RADIUS_PX * ERASER_RADIUS_PX;
     const left = Math.min(ax, bx) - ERASER_RADIUS_PX;
     const right = Math.max(ax, bx) + ERASER_RADIUS_PX;
@@ -2205,39 +1998,28 @@ function setupEditorInk({ layer, box, polaroid, data }) {
     function intersects(x0, y0, x1, y1) {
       // 지우개 이동 선분과 획 선분이 교차하는 경우
       const cross = (ux, uy, vx, vy) => ux * vy - uy * vx;
-      const d1 = cross(bx - ax, by - ay, x0 - ax, y0 - ay);
-      const d2 = cross(bx - ax, by - ay, x1 - ax, y1 - ay);
-      const d3 = cross(x1 - x0, y1 - y0, ax - x0, ay - y0);
-      const d4 = cross(x1 - x0, y1 - y0, bx - x0, by - y0);
-      if (
-        ((d1 <= 0 && d2 >= 0) || (d1 >= 0 && d2 <= 0)) &&
-        ((d3 <= 0 && d4 >= 0) || (d3 >= 0 && d4 <= 0))
-      )
-        return true;
+      const d1 = cross(bx-ax, by-ay, x0-ax, y0-ay);
+      const d2 = cross(bx-ax, by-ay, x1-ax, y1-ay);
+      const d3 = cross(x1-x0, y1-y0, ax-x0, ay-y0);
+      const d4 = cross(x1-x0, y1-y0, bx-x0, by-y0);
+      if (((d1 <= 0 && d2 >= 0) || (d1 >= 0 && d2 <= 0)) &&
+          ((d3 <= 0 && d4 >= 0) || (d3 >= 0 && d4 <= 0))) return true;
       // 교차하지 않아도 지우개 반경 이내면 삭제
-      return (
-        distanceSquaredToSegment(x0, y0, ax, ay, bx, by) <= radius2 ||
+      return distanceSquaredToSegment(x0, y0, ax, ay, bx, by) <= radius2 ||
         distanceSquaredToSegment(x1, y1, ax, ay, bx, by) <= radius2 ||
         distanceSquaredToSegment(ax, ay, x0, y0, x1, y1) <= radius2 ||
-        distanceSquaredToSegment(bx, by, x0, y0, x1, y1) <= radius2
-      );
+        distanceSquaredToSegment(bx, by, x0, y0, x1, y1) <= radius2;
     }
 
     let changed = false;
     const remaining = [];
     for (const line of strokes) {
       if (!line.length) continue;
-      let minX = Infinity,
-        minY = Infinity,
-        maxX = -Infinity,
-        maxY = -Infinity;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       for (const p of line) {
-        const x = p[0] * w,
-          y = p[1] * h;
-        minX = Math.min(minX, x);
-        maxX = Math.max(maxX, x);
-        minY = Math.min(minY, y);
-        maxY = Math.max(maxY, y);
+        const x = p[0] * w, y = p[1] * h;
+        minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y); maxY = Math.max(maxY, y);
       }
       if (maxX < left || minX > right || maxY < top || minY > bottom) {
         remaining.push(line);
@@ -2245,25 +2027,12 @@ function setupEditorInk({ layer, box, polaroid, data }) {
       }
       let hit = false;
       if (line.length === 1) {
-        hit =
-          distanceSquaredToSegment(
-            line[0][0] * w,
-            line[0][1] * h,
-            ax,
-            ay,
-            bx,
-            by,
-          ) <= radius2;
+        hit = distanceSquaredToSegment(line[0][0]*w, line[0][1]*h,
+          ax, ay, bx, by) <= radius2;
       } else {
         for (let i = 1; i < line.length; i++) {
-          if (
-            intersects(
-              line[i - 1][0] * w,
-              line[i - 1][1] * h,
-              line[i][0] * w,
-              line[i][1] * h,
-            )
-          ) {
+          if (intersects(line[i-1][0]*w, line[i-1][1]*h,
+            line[i][0]*w, line[i][1]*h)) {
             hit = true;
             break;
           }
@@ -2281,8 +2050,7 @@ function setupEditorInk({ layer, box, polaroid, data }) {
   function down(e) {
     if (mode === "none" || disposed || isControl(e.target)) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    if (e.isPrimary === false || pointerId !== null || !validPosition(e))
-      return;
+    if (e.isPrimary === false || pointerId !== null || !validPosition(e)) return;
 
     // 텍스트 선택/글쓰기보다 펜 또는 지우개를 우선
     e.preventDefault();
@@ -2298,19 +2066,11 @@ function setupEditorInk({ layer, box, polaroid, data }) {
       eraseBetween(previousPoint, previousPoint);
     }
     // pointer가 글, 사진 위를 지나도 같은 제스처 유지
-    try {
-      ink.setPointerCapture(pointerId);
-    } catch (_) {}
+    try { ink.setPointerCapture(pointerId); } catch (_) {}
   }
 
   function move(e) {
-    if (
-      mode === "none" ||
-      disposed ||
-      e.pointerId !== pointerId ||
-      !previousPoint
-    )
-      return;
+    if (mode === "none" || disposed || e.pointerId !== pointerId || !previousPoint) return;
     e.preventDefault();
     e.stopImmediatePropagation();
 
@@ -2320,16 +2080,11 @@ function setupEditorInk({ layer, box, polaroid, data }) {
     }
     const next = point(e.clientX, e.clientY);
     const r = rect();
-    const dist = Math.hypot(
-      (next[0] - previousPoint[0]) * r.width,
-      (next[1] - previousPoint[1]) * r.height,
-    );
-    const maxJump = Math.max(130, Math.min(250, r.width * 0.32));
+    const dist = Math.hypot((next[0] - previousPoint[0]) * r.width,
+      (next[1] - previousPoint[1]) * r.height);
+    const maxJump = Math.max(130, Math.min(250, r.width * .32));
     // (0,0) 등 튀는 터치 좌표로 긴 선이 생기는 것 방지
-    if (dist > maxJump) {
-      endGesture();
-      return;
-    }
+    if (dist > maxJump) { endGesture(); return; }
 
     if (mode === "pen") {
       if (dist >= 1.8 && currentStroke && currentStroke.length < 1800) {
@@ -2349,18 +2104,12 @@ function setupEditorInk({ layer, box, polaroid, data }) {
     if (validPosition(e) && previousPoint) {
       const next = point(e.clientX, e.clientY);
       const r = rect();
-      const dist = Math.hypot(
-        (next[0] - previousPoint[0]) * r.width,
-        (next[1] - previousPoint[1]) * r.height,
-      );
-      if (dist <= Math.max(130, Math.min(250, r.width * 0.32))) {
+      const dist = Math.hypot((next[0] - previousPoint[0]) * r.width,
+        (next[1] - previousPoint[1]) * r.height);
+      if (dist <= Math.max(130, Math.min(250, r.width * .32))) {
         if (mode === "eraser") eraseBetween(previousPoint, next);
-        else if (
-          mode === "pen" &&
-          currentStroke &&
-          dist >= 1.8 &&
-          currentStroke.length < 1800
-        ) {
+        else if (mode === "pen" && currentStroke && dist >= 1.8 &&
+          currentStroke.length < 1800) {
           currentStroke.push(next);
           redrawPath(currentPath, currentStroke);
         }
@@ -2369,9 +2118,7 @@ function setupEditorInk({ layer, box, polaroid, data }) {
     endGesture();
   }
 
-  function cancel(e) {
-    if (e.pointerId === pointerId) endGesture();
-  }
+  function cancel(e) { if (e.pointerId === pointerId) endGesture(); }
 
   function interceptClick(e) {
     // 펜/지우개 ON 중에도 저장·취소·X 및 도구 버튼은 클릭 가능
@@ -2389,9 +2136,7 @@ function setupEditorInk({ layer, box, polaroid, data }) {
   document.addEventListener("click", interceptClick, true);
 
   return {
-    serialize() {
-      return strokes.map((s) => s.map((p) => [...p]));
-    },
+    serialize() { return strokes.map(s => s.map(p => [...p])); },
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -2405,7 +2150,7 @@ function setupEditorInk({ layer, box, polaroid, data }) {
       eraser.remove();
       ink.remove();
       box.classList.remove("editor-inking", "editor-erasing");
-    },
+    }
   };
 }
 
@@ -2581,9 +2326,6 @@ function openEditor(source, key) {
     node.addEventListener("wheel", blockBubble, { passive: true });
   });
 
-  memoPad.addEventListener("focus", () => {
-    box.scrollIntoView({ block: "center", behavior: "smooth" });
-  });
 
   media.addEventListener("click", () => openPhotoViewer(data.image));
 
@@ -2710,13 +2452,15 @@ function closePhotoViewer() {
 // 7. 길게 누르기 → 다중 선택 → 일괄 날짜 변경 / 삭제
 // -------------------------------------------------------------------
 function enterBatch(source, key) {
+  if (!archiveOpen || source !== "locker" || busy) return;
   batchMode = true;
-  batchSelected.add(itemId(source, key));
+  batchSelected.add(itemId("locker", key));
   refreshBatch();
-  if (navigator.vibrate) navigator.vibrate(20);
+  navigator.vibrate?.(18);
 }
 function toggleBatch(source, key) {
-  const id = itemId(source, key);
+  if (!batchMode || source !== "locker" || busy) return;
+  const id = itemId(source,key);
   if (batchSelected.has(id)) batchSelected.delete(id);
   else batchSelected.add(id);
   refreshBatch();
@@ -2725,172 +2469,233 @@ function leaveBatch() {
   if (busy) return;
   batchMode = false;
   batchSelected.clear();
+  document.body.classList.remove("batch-dragging");
+  $("archive-trash-zone").classList.remove("is-over");
   refreshBatch();
 }
 function visibleCards() {
-  return [
-    ...document.querySelectorAll(
-      archiveOpen ? ".album-photo[data-key]" : ".polaroid[data-key]",
-    ),
-  ];
+  return [...document.querySelectorAll("#album-rail .album-photo[data-key]")];
 }
 function refreshBatch() {
-  document.body.classList.toggle("batch-mode", batchMode);
+  document.body.classList.toggle("batch-mode",batchMode);
   $("batch-bar").hidden = !batchMode;
-  document
-    .querySelectorAll(".polaroid[data-key],.album-photo[data-key]")
-    .forEach((el) =>
-      el.classList.toggle(
-        "selected",
-        batchSelected.has(itemId(el.dataset.source, el.dataset.key)),
-      ),
-    );
+  $("archive-trash-zone").hidden = !batchMode;
+  for (const el of document.querySelectorAll(".album-photo[data-key]")) {
+    el.classList.toggle("selected", batchSelected.has(itemId(el.dataset.source,el.dataset.key)));
+  }
   $("batch-count").textContent = `${batchSelected.size}개 선택됨`;
-  $("batch-all").textContent =
-    visibleCards().length &&
-    visibleCards().every((el) =>
-      batchSelected.has(itemId(el.dataset.source, el.dataset.key)),
-    )
-      ? "전체 해제"
-      : "전체 선택";
-  $("batch-date").disabled = $("batch-delete").disabled =
-    batchSelected.size === 0 || busy;
+  const cards = visibleCards();
+  $("batch-all").textContent = cards.length && cards.every(el => batchSelected.has(itemId("locker",el.dataset.key)))
+    ? "전체 해제" : "전체 선택";
+  $("batch-date").disabled = batchSelected.size === 0 || busy;
+  $("archive-trash-count").textContent = `${batchSelected.size}장`;
 }
 function toggleAll() {
+  if (busy) return;
   const cards = visibleCards();
-  const all =
-    cards.length &&
-    cards.every((el) =>
-      batchSelected.has(itemId(el.dataset.source, el.dataset.key)),
-    );
-  cards.forEach((el) => {
-    const id = itemId(el.dataset.source, el.dataset.key);
+  const all = cards.length && cards.every(el => batchSelected.has(itemId("locker",el.dataset.key)));
+  for (const card of cards) {
+    const id = itemId("locker",card.dataset.key);
     if (all) batchSelected.delete(id);
     else batchSelected.add(id);
-  });
+  }
   refreshBatch();
 }
 function selectedItems() {
-  return [...batchSelected].map(splitId).filter((x) => record(x.source, x.key));
+  return [...batchSelected].map(splitId).filter(item =>
+    item.source === "locker" && record("locker",item.key));
 }
-function askDelete(count) {
-  return new Promise((resolve) => {
-    const ui = dialogFrame(
-      "정말로 삭제하시겠습니까?",
-      `선택한 ${count}개의 사진/메모가 삭제돼요. 삭제 후 복구할 수 없어요.`,
-    );
-    const row = document.createElement("label");
-    row.style.cssText =
-      "display:flex;gap:8px;align-items:center;font-size:12px;color:#7a8598;margin-top:20px";
-    const check = document.createElement("input");
-    check.type = "checkbox";
-    row.append(check, document.createTextNode("다시 보지 않기"));
-    const actions = document.createElement("div");
-    actions.className = "dialog-actions";
-    const cancel = document.createElement("button");
-    cancel.textContent = "취소";
-    const ok = document.createElement("button");
-    ok.className = "danger";
-    ok.textContent = "삭제";
-    actions.append(cancel, ok);
-    ui.box.append(row, actions);
-    const end = (value) => {
-      ui.layer.remove();
-      resolve(value);
-    };
-    ui.x.onclick = cancel.onclick = () => end(false);
-    ok.onclick = () => {
-      if (check.checked) {
-        try {
-          localStorage.setItem(SKIP_DELETE, "1");
-        } catch {}
-      }
-      end(true);
-    };
-  });
-}
-async function batchDelete() {
-  const items = selectedItems();
-  if (!items.length || busy) return;
-  let skip = false;
-  try {
-    skip = localStorage.getItem(SKIP_DELETE) === "1";
-  } catch {}
-  if (!skip && !(await askDelete(items.length))) return;
-  busy = true;
-  let success = 0;
-  try {
-    for (const { source, key } of items) {
-      try {
-        await db.ref(pathFor(source)).child(key).remove();
-        success++;
-        batchSelected.delete(itemId(source, key));
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    toast(`${success}개의 기록을 삭제했어요.`);
-  } finally {
-    busy = false;
-    if (!batchSelected.size) leaveBatch();
-    else refreshBatch();
-  }
-}
-async function batchChangeDate() {
-  const items = selectedItems();
-  if (!items.length || busy) return;
-  const chosen = await chooseMissingPhotoDate();
-  if (chosen === null) return;
-  busy = true;
-  let success = 0;
-  try {
-    for (const { source, key } of items) {
-      const data = record(source, key);
-      if (!data) continue;
-      const old = new Date(memoTime(data)),
-        day = new Date(chosen);
-      const updated = new Date(
-        day.getFullYear(),
-        day.getMonth(),
-        day.getDate(),
-        old.getHours(),
-        old.getMinutes(),
-        old.getSeconds(),
-      ).getTime();
-      try {
-        await db
-          .ref(pathFor(source))
-          .child(key)
-          .update({ capturedAt: updated, dateSource: "manual" });
-        success++;
-        batchSelected.delete(itemId(source, key));
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    toast(`${success}개의 날짜를 바꿨어요.`);
-  } finally {
-    busy = false;
-    if (!batchSelected.size) leaveBatch();
-    else refreshBatch();
-  }
+function isInArchiveTrash(x,y) {
+  const r = $("archive-trash-zone").getBoundingClientRect();
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
 }
 
-// -------------------------------------------------------------------
-// 8. 초기화
-// -------------------------------------------------------------------
-function setupViewportResize() {
-  const apply = () =>
-    document.documentElement.style.setProperty(
-      "--visual-height",
-      (window.visualViewport?.height || window.innerHeight) + "px",
-    );
-  apply();
-  window.visualViewport?.addEventListener("resize", apply);
-  window.addEventListener("resize", apply);
+// Drag a selected album polaroid: all selected photos travel together.
+function setupArchiveBatchDrag() {
+  const rail = $("album-rail");
+  if (!rail) return;
+
+  let session = null;
+  let ghost = null;
+
+  function trashContains(x, y) {
+    return batchMode && !$("archive-trash-zone").hidden && isInArchiveTrash(x, y);
+  }
+
+  function updateDrag(x, y) {
+    if (!ghost) return;
+    ghost.style.left = `${x}px`;
+    ghost.style.top = `${y}px`;
+    $("archive-trash-zone").classList.toggle("is-over", trashContains(x, y));
+  }
+
+  function createGhost(x, y) {
+    const chosen = selectedItems();
+    if (!chosen.length) return;
+
+    ghost = document.createElement("div");
+    ghost.className = "batch-drag-ghost";
+    ghost.setAttribute("aria-hidden", "true");
+
+    // 최대 3장만 겹쳐 보이지만, 실제로는 선택된 모든 사진이 이동함.
+    chosen.slice(0, 3).forEach((item, index) => {
+      const picture = document.createElement("div");
+      picture.className = "ghost-picture";
+      picture.style.setProperty("--angle", `${[-11, 0, 9][index]}deg`);
+      picture.style.setProperty("--shift-x", `${index * 7}px`);
+      picture.style.setProperty("--shift-y", `${index * 5}px`);
+      const img = new Image();
+      img.src = record("locker", item.key)?.image || "";
+      img.draggable = false;
+      picture.append(img);
+      ghost.append(picture);
+    });
+
+    const counter = document.createElement("span");
+    counter.className = "ghost-count";
+    counter.textContent = `${chosen.length}장`;
+    ghost.append(counter);
+    document.body.append(ghost);
+    document.body.classList.add("batch-dragging");
+    for (const card of visibleCards()) {
+      card.classList.toggle("is-drag-source", batchSelected.has(itemId("locker", card.dataset.key)));
+    }
+    updateDrag(x, y);
+  }
+
+  function clearDrag() {
+    ghost?.remove();
+    ghost = null;
+    document.body.classList.remove("batch-dragging");
+    $("archive-trash-zone").classList.remove("is-over");
+    for (const photo of rail.querySelectorAll(".album-photo.is-drag-source")) {
+      photo.classList.remove("is-drag-source");
+    }
+  }
+
+  rail.addEventListener("pointerdown", (event) => {
+    const photo = event.target instanceof Element
+      ? event.target.closest(".album-photo[data-key]") : null;
+    if (!photo || busy || (event.pointerType === "mouse" && event.button !== 0)) return;
+    session = {
+      pointerId: event.pointerId,
+      key: photo.dataset.key,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: false,
+    };
+  });
+
+  rail.addEventListener("pointermove", (event) => {
+    if (!session || session.pointerId !== event.pointerId || busy || !batchMode) return;
+    if (!batchSelected.has(itemId("locker", session.key))) return;
+
+    const moved = Math.hypot(event.clientX - session.startX, event.clientY - session.startY);
+    if (!session.dragging && moved > 10) {
+      session.dragging = true;
+      archiveDragSuppressUntil = performance.now() + 600;
+      try { rail.setPointerCapture(event.pointerId); } catch (_) {}
+      createGhost(event.clientX, event.clientY);
+    }
+    if (session.dragging) {
+      event.preventDefault();
+      updateDrag(event.clientX, event.clientY);
+    }
+  });
+
+  function finish(event) {
+    if (!session || session.pointerId !== event.pointerId) return;
+    const dropped = session.dragging && event.type === "pointerup" &&
+      trashContains(event.clientX, event.clientY);
+    const dragged = session.dragging;
+    session = null;
+    try {
+      if (rail.hasPointerCapture(event.pointerId)) rail.releasePointerCapture(event.pointerId);
+    } catch (_) {}
+    if (dragged) archiveDragSuppressUntil = performance.now() + 650;
+    clearDrag();
+    if (dropped) void deleteArchiveSelectionAt(event.clientX, event.clientY);
+  }
+  rail.addEventListener("pointerup", finish);
+  rail.addEventListener("pointercancel", finish);
+  window.addEventListener("blur", () => {
+    session = null;
+    clearDrag();
+  });
 }
-// Archive polaroids: one blue pin per card (drawn in CSS), lightweight pendulum.
-// Place this whole function BEFORE function init() in sketch.js.
+
+async function deleteArchiveSelectionAt(x, y) {
+  const chosen = selectedItems();
+  if (!chosen.length || busy) return;
+  busy = true;
+  refreshBatch();
+
+  const keys = new Set(chosen.map(item => item.key));
+  const nodes = visibleCards().filter(photo => keys.has(photo.dataset.key));
+
+  // 인화실과 동일한 흰색 삼각형 파기 이펙트.
+  // 여러 장일 때는 2~3번 겹쳐 퍼지도록 하되 과도한 연산은 막음.
+  const bursts = Math.min(3, chosen.length);
+  for (let i = 0; i < bursts; i++) {
+    playDarkroomShredEffect(x + (i - (bursts - 1) / 2) * 35, y - i * 12);
+  }
+  for (const node of nodes) {
+    node.style.pointerEvents = "none";
+    node.animate([
+      { opacity: 1, filter: "blur(0px)", transform: getComputedStyle(node).transform },
+      { opacity: 0, filter: "blur(5px)", transform: "translateY(14px) rotate(9deg) scale(.72)" }
+    ], { duration: 900, easing: "ease-out", fill: "forwards" });
+  }
+
+  // 이펙트를 보여준 다음 Firebase의 선택한 사진을 삭제.
+  await new Promise(resolve => setTimeout(resolve, 950));
+  const results = await Promise.allSettled(
+    chosen.map(item => db.ref("saved_memos").child(item.key).remove())
+  );
+  let removed = 0;
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      removed++;
+      batchSelected.delete(itemId("locker", chosen[index].key));
+    } else {
+      console.error("앨범 사진 파기 실패:", chosen[index].key, result.reason);
+    }
+  });
+  busy = false;
+  drawAlbums();
+  if (!batchSelected.size) leaveBatch();
+  else refreshBatch();
+  toast(removed === chosen.length
+    ? `${removed}장의 사진을 파기했어요.`
+    : `${removed}장 삭제, ${chosen.length - removed}장 실패. 다시 시도해 주세요.`);
+}
+
+async function batchChangeDate() {
+  const chosen = selectedItems();
+  if (!chosen.length || busy) return;
+  const date = await chooseMissingPhotoDate();
+  if (date === null) return;
+  busy = true;
+  let changed = 0;
+  for (const {key} of chosen) {
+    const data = record("locker",key);
+    if (!data) continue;
+    const old = new Date(memoTime(data));
+    const day = new Date(date);
+    const newAt = new Date(day.getFullYear(),day.getMonth(),day.getDate(),
+      old.getHours(),old.getMinutes(),old.getSeconds()).getTime();
+    try {
+      await db.ref("saved_memos").child(key).update({capturedAt:newAt,dateSource:"manual"});
+      changed++;
+      batchSelected.delete(itemId("locker",key));
+    } catch(e) {console.error(e);}
+  }
+  busy = false;
+  if (!batchSelected.size) leaveBatch();
+  else refreshBatch();
+  toast(`${changed}장의 날짜를 수정했어요.`);
+}
+
 function setupArchivePhotoSwing() {
   const rail = $("album-rail");
   if (!rail || rail.dataset.swingSetup === "1") return;
@@ -2907,21 +2712,13 @@ function setupArchivePhotoSwing() {
 
   function run(now) {
     frame = 0;
-    const dt = lastFrameTime
-      ? Math.min((now - lastFrameTime) / 1000, 0.035)
-      : 1 / 60;
+    const dt = lastFrameTime ? Math.min((now - lastFrameTime) / 1000, 0.035) : 1 / 60;
     lastFrameTime = now;
     const archiveVisible = document.body.classList.contains("archive-open");
 
     for (const photo of moving) {
       const state = states.get(photo);
-      if (
-        !state ||
-        !photo.isConnected ||
-        !visible.has(photo) ||
-        !archiveVisible ||
-        reduced.matches
-      ) {
+      if (!state || !photo.isConnected || !visible.has(photo) || !archiveVisible || reduced.matches) {
         photo.classList.remove("is-swinging");
         photo.style.removeProperty("--swing-angle");
         moving.delete(photo);
@@ -2947,12 +2744,7 @@ function setupArchivePhotoSwing() {
   }
 
   function nudge(photo, velocity) {
-    if (
-      !visible.has(photo) ||
-      reduced.matches ||
-      !document.body.classList.contains("archive-open")
-    )
-      return;
+    if (!visible.has(photo) || reduced.matches || !document.body.classList.contains("archive-open")) return;
     const state = states.get(photo);
     if (!state) return;
     state.velocity = Math.max(-90, Math.min(90, state.velocity + velocity));
@@ -2961,24 +2753,21 @@ function setupArchivePhotoSwing() {
     if (!frame) frame = requestAnimationFrame(run);
   }
 
-  const observer = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        const photo = entry.target;
-        if (entry.isIntersecting) {
-          visible.add(photo);
-          // A small one-time swing when an album comes into view.
-          if (!states.get(photo).introduced) {
-            states.get(photo).introduced = true;
-            nudge(photo, 33);
-          }
-        } else {
-          visible.delete(photo);
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      const photo = entry.target;
+      if (entry.isIntersecting) {
+        visible.add(photo);
+        // A small one-time swing when an album comes into view.
+        if (!states.get(photo).introduced) {
+          states.get(photo).introduced = true;
+          nudge(photo, 33);
         }
+      } else {
+        visible.delete(photo);
       }
-    },
-    { root: rail, rootMargin: "0px 65px", threshold: 0 },
-  );
+    }
+  }, { root: rail, rootMargin: "0px 65px", threshold: 0 });
 
   function watchCards() {
     // drawAlbums() may replace the whole rail: release old DOM references.
@@ -3002,43 +2791,39 @@ function setupArchivePhotoSwing() {
   watchCards();
 
   // Scrolling moves the album; inertia makes the photos sway the other way.
-  rail.addEventListener(
-    "scroll",
-    () => {
-      const delta = rail.scrollLeft - previousScroll;
-      previousScroll = rail.scrollLeft;
-      if (Math.abs(delta) < 0.4) return;
-      const push = Math.max(-65, Math.min(65, -delta * 1.8));
-      for (const photo of visible) nudge(photo, push);
-    },
-    { passive: true },
-  );
+  rail.addEventListener("scroll", () => {
+    const delta = rail.scrollLeft - previousScroll;
+    previousScroll = rail.scrollLeft;
+    if (Math.abs(delta) < 0.4) return;
+    const push = Math.max(-65, Math.min(65, -delta * 1.8));
+    for (const photo of visible) nudge(photo, push);
+  }, { passive: true });
 
   // A tap or hold causes a tiny wiggle but does not block normal photo editing.
-  rail.addEventListener(
-    "pointerdown",
-    (event) => {
-      const photo =
-        event.target instanceof Element
-          ? event.target.closest(".album-photo")
-          : null;
-      if (photo)
-        nudge(
-          photo,
-          event.clientX <
-            photo.getBoundingClientRect().left + photo.clientWidth / 2
-            ? -48
-            : 48,
-        );
-    },
-    { passive: true },
-  );
+  rail.addEventListener("pointerdown", (event) => {
+    const photo = event.target instanceof Element
+      ? event.target.closest(".album-photo") : null;
+    if (photo) nudge(photo, event.clientX < photo.getBoundingClientRect().left + photo.clientWidth / 2 ? -48 : 48);
+  }, { passive: true });
+}
+
+// -------------------------------------------------------------------
+// 8. 초기화
+// -------------------------------------------------------------------
+function setupViewportResize() {
+  const apply = () =>
+    document.documentElement.style.setProperty(
+      "--visual-height",
+      (window.visualViewport?.height || window.innerHeight) + "px",
+    );
+  apply();
+  window.visualViewport?.addEventListener("resize", apply);
+  window.addEventListener("resize", apply);
 }
 function init() {
   // 예전 좌우 이동 버튼을 제거했더라도 오류가 나지 않게 함
   $("archive-tab").onclick = () => setArchive(true);
   $("archive-close").onclick = () => setArchive(false);
-  $("archive-grip").onclick = () => setArchive(false);
   $("camera-btn").onclick = () => $("camera-input").click();
   $("gallery-btn").onclick = () => $("gallery-input").click();
   for (const id of ["camera-input", "gallery-input"]) {
@@ -3059,13 +2844,13 @@ function init() {
   $("viewer-close").onclick = closePhotoViewer;
   $("batch-all").onclick = toggleAll;
   $("batch-cancel").onclick = leaveBatch;
-  $("batch-delete").onclick = batchDelete;
   $("batch-date").onclick = batchChangeDate;
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("photo-viewer").hidden) closePhotoViewer();
   });
   setupSwipes();
   setupArchiveRailDrag();
+  setupArchiveBatchDrag();
   setupArchivePhotoSwing();
   setupViewportResize();
   if (!db || typeof db.ref !== "function") {

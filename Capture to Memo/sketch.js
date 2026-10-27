@@ -10,6 +10,9 @@ const saved = new Map();
 const batchSelected = new Set();
 let room = "cover";
 let archiveOpen = false;
+// 보관함: 책장(shelf)과 월별 펼친 앨범(albums) 화면 전환
+let archiveView = "albums";
+let archiveMonth = null; // 예: "2026-10". null은 전체 검색 결과
 let editorItem = null;
 let busy = false;
 let batchMode = false;
@@ -238,9 +241,12 @@ function goRoom(next) {
 }
 function setArchive(open) {
   if (batchMode || busy) return;
+  const entering = !!open && !archiveOpen;
   archiveOpen = !!open;
   document.body.classList.toggle("archive-open", archiveOpen);
   $("archive-sheet").setAttribute("aria-hidden", String(!archiveOpen));
+  // 열 때는 월별 책장을 보여주고, 메인 화면 가로 위치는 건드리지 않음.
+  if (entering) showArchiveAll();
 }
 function setupSwipes() {
   const world = $("world");
@@ -375,9 +381,10 @@ function setupSwipes() {
         y: touch.clientY,
         target: event.target,
         startedAt: performance.now(),
-        pageScrollTop: event.target instanceof Element
-          ? (event.target.closest(".album-page")?.scrollTop || 0)
-          : 0,
+        pageScrollTop:
+          event.target instanceof Element
+            ? event.target.closest(".album-page")?.scrollTop || 0
+            : 0,
       };
     },
     { capture: true, passive: true },
@@ -395,11 +402,18 @@ function setupSwipes() {
       if (Math.abs(dy) < 65 || Math.abs(dy) < Math.abs(dx) * 1.3) return;
       if (archiveOpen) {
         const target = start.target instanceof Element ? start.target : null;
-        const isInput = target?.closest("input,textarea,select,[contenteditable]");
+        const isInput = target?.closest(
+          "input,textarea,select,[contenteditable]",
+        );
         const isPhoto = target?.closest(".album-photo");
-        if (!batchMode && !isInput && !isPhoto && dy > 105 &&
-            performance.now() - start.startedAt < 550 &&
-            start.pageScrollTop < 3) {
+        if (
+          !batchMode &&
+          !isInput &&
+          !isPhoto &&
+          dy > 105 &&
+          performance.now() - start.startedAt < 550 &&
+          start.pageScrollTop < 3
+        ) {
           setArchive(false); // keep previous horizontal location
         }
       } else if (dy < 0 && start.y > window.innerHeight * 0.62) {
@@ -447,7 +461,10 @@ function setupArchiveRailDrag() {
     };
   });
   rail.addEventListener("pointermove", (event) => {
-    if (batchMode) { drag = null; return; }
+    if (batchMode) {
+      drag = null;
+      return;
+    }
     if (!drag || event.pointerId !== drag.id) return;
     const dx = event.clientX - drag.x;
     const dy = event.clientY - drag.y;
@@ -546,14 +563,19 @@ function installPhotoInteraction(el, source, key) {
     }, 570);
   });
   el.addEventListener("pointermove", (event) => {
-    if (point?.id === event.pointerId &&
-        Math.hypot(event.clientX - point.x, event.clientY - point.y) > 11) {
+    if (
+      point?.id === event.pointerId &&
+      Math.hypot(event.clientX - point.x, event.clientY - point.y) > 11
+    ) {
       clearTimeout(holdTimer);
       holdTimer = 0;
     }
   });
   for (const name of ["pointerup", "pointercancel", "pointerleave"]) {
-    el.addEventListener(name, () => { clearTimeout(holdTimer); holdTimer = 0; });
+    el.addEventListener(name, () => {
+      clearTimeout(holdTimer);
+      holdTimer = 0;
+    });
   }
   el.addEventListener("click", (event) => {
     event.preventDefault();
@@ -566,7 +588,11 @@ function installPhotoInteraction(el, source, key) {
       toggleBatch(source, key);
       return;
     }
-    if (batchMode || source === "incoming" && el.classList.contains("hanging-polaroid")) return;
+    if (
+      batchMode ||
+      (source === "incoming" && el.classList.contains("hanging-polaroid"))
+    )
+      return;
     openEditor(source, key);
   });
   const check = document.createElement("span");
@@ -750,9 +776,7 @@ function getOverflowWirePoint(t) {
 }
 
 function getDarkroomHangerPoint(h) {
-  return h.lane === 1
-    ? getOverflowWirePoint(h.t)
-    : getDarkroomWirePoint(h.t);
+  return h.lane === 1 ? getOverflowWirePoint(h.t) : getDarkroomWirePoint(h.t);
 }
 
 function updateOverflowWire(show, minT, maxT) {
@@ -773,7 +797,7 @@ function updateOverflowWire(show, minT, maxT) {
   path.setAttribute(
     "d",
     `M ${(2 * a * w).toFixed(1)} ${((0.47 - 0.28 * a) * h).toFixed(1)}` +
-    ` L ${(2 * b * w).toFixed(1)} ${((0.47 - 0.28 * b) * h).toFixed(1)}`,
+      ` L ${(2 * b * w).toFixed(1)} ${((0.47 - 0.28 * b) * h).toFixed(1)}`,
   );
   path.classList.toggle("is-visible", Boolean(show));
 }
@@ -813,9 +837,10 @@ function distributeDarkroomHangers(all = incomingChronologicalRows()) {
     const desiredLane = i < frontCount ? 0 : 1;
     const laneIndex = desiredLane === 0 ? i : i - frontCount;
     const laneSize = desiredLane === 0 ? frontCount : backCount;
-    const step = laneSize > 1
-      ? Math.min(preferredStep, (maxT - minT) / (laneSize - 1))
-      : 0;
+    const step =
+      laneSize > 1
+        ? Math.min(preferredStep, (maxT - minT) / (laneSize - 1))
+        : 0;
 
     h.targetT = maxT - laneIndex * step;
     h.targetLane = desiredLane;
@@ -1306,7 +1331,8 @@ function animateDarkroomLines(now) {
       h.el.style.top = `${p.y + o.y}px`;
       h.el.style.transform = `translateX(-50%) rotate(${h.swing}rad)`;
       // 뒷줄은 앞줄보다 뒤에 보이도록 쌓임 순서 변경.
-      h.el.style.zIndex = h.lane === 1 ? "2" : String(5 + Math.round(h.targetT * 100));
+      h.el.style.zIndex =
+        h.lane === 1 ? "2" : String(5 + Math.round(h.targetT * 100));
     }
 
     h.el.classList.toggle("is-overflow", h.lane === 1 && !h.detached);
@@ -1315,19 +1341,206 @@ function animateDarkroomLines(now) {
     const baseOpacity = h.lane === 1 ? 0.46 : 1;
     h.el.style.opacity = String(
       (h.detached || h.returning ? 1 : (h.landed ? 1 : appear) * baseOpacity) *
-      switchOpacity,
+        switchOpacity,
     );
     h.el.style.visibility = "visible";
 
     if (
       darkroomPhysics.photoDrag?.active &&
       Math.abs(darkroomPhysics.photoDrag.t - h.t) < 0.001
-    ) h.el.style.zIndex = "500";
+    )
+      h.el.style.zIndex = "500";
   }
   renderDarkroomBendingWire();
 }
 
 // Photo movement is implemented in animateDarkroomLines above.
+
+// -------------------------------------------------------------------
+// 4A. 월별 책장: 각 칸이 한 달, 클릭하면 해당 월의 기존 앨범 열기
+// -------------------------------------------------------------------
+const ARCHIVE_MONTH_NAMES = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
+];
+
+function syncArchiveBookcaseView() {
+  const shelf = $("archive-bookshelf");
+  const rail = $("album-rail");
+  const nav = $("archive-month-nav");
+  const viewingShelf = archiveView === "shelf";
+  shelf.hidden = !viewingShelf;
+  rail.hidden = viewingShelf;
+  nav.hidden = viewingShelf || batchMode;
+  document.body.classList.toggle("archive-shelf-view", viewingShelf);
+
+  const caption = $("archive-month-caption");
+  if (archiveMonth) {
+    const [year, month] = archiveMonth.split("-").map(Number);
+    caption.textContent = `${year}년 ${month}월의 기록`;
+  } else {
+    caption.textContent = "전체 기록";
+  }
+}
+
+function showArchiveAll() {
+  if (batchMode || busy) return;
+
+  archiveView = "albums";
+  archiveMonth = null;
+
+  $("archive-search").value = "";
+  $("archive-date").value = "";
+
+  syncArchiveBookcaseView();
+  $("album-rail").scrollLeft = 0;
+  drawAlbums();
+}
+
+function showArchiveBookshelf() {
+  if (batchMode || busy) return;
+  archiveView = "shelf";
+  archiveMonth = null;
+  $("archive-search").value = "";
+  $("archive-date").value = "";
+  syncArchiveBookcaseView();
+  renderArchiveBookshelf();
+}
+
+function openArchiveMonth(monthKey) {
+  if (busy || batchMode || !/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey)) return;
+  archiveView = "albums";
+  archiveMonth = monthKey;
+  $("archive-search").value = "";
+  $("archive-date").value = "";
+  syncArchiveBookcaseView();
+  $("album-rail").scrollLeft = 0;
+  drawAlbums();
+}
+
+function searchArchiveAcrossMonths() {
+  if (busy || batchMode) return;
+  const q = $("archive-search").value.trim();
+  const date = $("archive-date").value;
+  if (!q && !date) {
+    showArchiveAll();
+    return;
+  }
+  archiveView = "albums";
+  archiveMonth = null;
+  syncArchiveBookcaseView();
+  $("album-rail").scrollLeft = 0;
+  drawAlbums();
+}
+
+function renderArchiveBookshelf() {
+  const host = $("archive-bookshelf");
+  if (!host || archiveView !== "shelf") return;
+  const savedScroll = host.scrollTop;
+  const months = new Map();
+  for (const [key, data] of saved) {
+    if (!data?.image) continue;
+    const day = localDay(memoTime(data));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+    const monthKey = day.slice(0, 7);
+    if (!months.has(monthKey)) months.set(monthKey, []);
+    months.get(monthKey).push({ key, data });
+  }
+
+  host.replaceChildren();
+  const head = document.createElement("div");
+  head.className = "bookshelf-heading";
+  const kicker = document.createElement("span");
+  kicker.textContent = "MEMORIES BY MONTH";
+  const title = document.createElement("h2");
+  title.textContent = "월별 책장";
+  const description = document.createElement("p");
+  description.textContent =
+    "책장의 칸을 눌러 그 달에 보관한 사진들을 펼쳐보세요.";
+  head.append(kicker, title, description);
+  host.append(head);
+
+  if (!months.size) {
+    const empty = document.createElement("p");
+    empty.className = "shelf-empty";
+    empty.textContent =
+      "아직 책장에 꽂을 추억이 없어요. 인화실에서 첫 사진을 보관해 보세요.";
+    host.append(empty);
+    return;
+  }
+
+  const years = new Map();
+  for (const monthKey of [...months.keys()].sort().reverse()) {
+    const year = monthKey.slice(0, 4);
+    if (!years.has(year)) years.set(year, []);
+    years.get(year).push(monthKey);
+  }
+
+  for (const [year, monthKeys] of years) {
+    const section = document.createElement("section");
+    section.className = "bookshelf-year";
+    const label = document.createElement("h3");
+    label.textContent = `${year} / YEAR`;
+    section.append(label);
+    const grid = document.createElement("div");
+    grid.className = "bookshelf-month-grid";
+    for (const key of monthKeys) {
+      const count = months.get(key).length;
+      const mm = Number(key.slice(5, 7));
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "bookshelf-cubby";
+      button.setAttribute(
+        "aria-label",
+        `${year}년 ${mm}월, 사진 ${count}장. 펼쳐보기`,
+      );
+      const small = document.createElement("span");
+      small.className = "shelf-month-english";
+      small.textContent = ARCHIVE_MONTH_NAMES[mm - 1];
+      const monthTitle = document.createElement("span");
+      monthTitle.className = "shelf-month-title";
+      monthTitle.textContent = `${mm}월`;
+      const number = document.createElement("span");
+      number.className = "shelf-photo-count";
+      number.textContent = `${count} PHOTOS`;
+      const books = document.createElement("span");
+      books.className = "shelf-book-row";
+      books.setAttribute("aria-hidden", "true");
+      const bookCount = Math.min(6, Math.max(2, Math.ceil(count / 3)));
+      for (let j = 0; j < bookCount; j++) {
+        const spine = document.createElement("i");
+        spine.className = "shelf-book-spine";
+        spine.style.setProperty(
+          "--spine-color",
+          ["#b4c5f3", "#9facdc", "#d6dff9", "#c8d9ef", "#b9c9ea", "#e2dbf3"][
+            (mm + j) % 6
+          ],
+        );
+        spine.style.setProperty(
+          "--spine-height",
+          `${67 + ((mm + j * 5) % 5) * 9}px`,
+        );
+        books.append(spine);
+      }
+      button.append(small, monthTitle, number, books);
+      button.addEventListener("click", () => openArchiveMonth(key));
+      grid.append(button);
+    }
+    section.append(grid);
+    host.append(section);
+  }
+  host.scrollTop = savedScroll;
+}
 
 // -------------------------------------------------------------------
 // 4. 보관함: 날짜 1개=1페이지, 날짜 2개=1권
@@ -1360,7 +1573,7 @@ function createAlbumPhoto(row) {
   card.dataset.title = String(row.data.labelTxt || "").trim() || "제목 없음";
   card.title = row.data.labelTxt || row.day;
   const angles = [-3, 2, -1.8, 3.4, 1.2, -2.5, 2.8, -1];
-  const hash = [...String(row.key)].reduce((n,ch) => n + ch.charCodeAt(0), 0);
+  const hash = [...String(row.key)].reduce((n, ch) => n + ch.charCodeAt(0), 0);
   card.style.setProperty("--photo-angle", `${angles[hash % angles.length]}deg`);
   const img = new Image();
   img.src = row.data.image;
@@ -1378,7 +1591,9 @@ function createPage(dates, rows) {
   const heading = document.createElement("p");
   heading.className = "page-date";
   const labels = dates.map(relativeDay).join(" · ");
-  heading.textContent = dates.length ? `${labels} / ${rows.length} PHOTOS` : "BLANK PAGE";
+  heading.textContent = dates.length
+    ? `${labels} / ${rows.length} PHOTOS`
+    : "BLANK PAGE";
   page.append(heading);
   if (!rows.length) {
     const empty = document.createElement("p");
@@ -1397,13 +1612,21 @@ function createPage(dates, rows) {
 function drawAlbums() {
   const rail = $("album-rail");
   if (!rail) return;
+  if (archiveView === "shelf") {
+    renderArchiveBookshelf();
+    refreshBatch();
+    return;
+  }
   const scroll = rail.scrollLeft;
-  const rows = filteredSaved();
+  const rows = filteredSaved().filter(
+    (row) => !archiveMonth || row.day.startsWith(archiveMonth + "-"),
+  );
   rail.replaceChildren();
   if (!rows.length) {
     const empty = document.createElement("div");
     empty.className = "archive-empty";
-    empty.textContent = "아직 펼칠 앨범이 없어요. 인화실에서 사진을 저장해 보세요.";
+    empty.textContent =
+      "아직 펼칠 앨범이 없어요. 인화실에서 사진을 저장해 보세요.";
     rail.append(empty);
     refreshBatch();
     return;
@@ -1418,39 +1641,45 @@ function drawAlbums() {
   let pending = [];
   function flush() {
     if (!pending.length) return;
-    pages.push({dates: pending.slice(), photos: pending.flatMap(day => days.get(day))});
+    pages.push({
+      dates: pending.slice(),
+      photos: pending.flatMap((day) => days.get(day)),
+    });
     pending = [];
   }
   for (const day of dates) {
     if (days.get(day).length >= 3) {
       flush();
-      pages.push({dates:[day], photos:days.get(day)});
+      pages.push({ dates: [day], photos: days.get(day) });
     } else {
       pending.push(day);
       if (pending.length === 3) flush();
     }
   }
   flush();
-  const covers = ["#b9ccef","#e2c8b0","#b8cdbf","#e5b8bf","#c5badc"];
-  const rotations = [-4.2,3.3,-2.4,4.5,-3.5,2.1];
+  const covers = ["#b9ccef", "#e2c8b0", "#b8cdbf", "#e5b8bf", "#c5badc"];
+  const rotations = [-4.2, 3.3, -2.4, 4.5, -3.5, 2.1];
   for (let i = 0; i < pages.length; i += 2) {
     const a = pages[i];
-    const b = pages[i + 1] || {dates:[],photos:[]};
+    const b = pages[i + 1] || { dates: [], photos: [] };
     const index = i / 2;
-    const all = [...a.dates,...b.dates];
+    const all = [...a.dates, ...b.dates];
     const newest = all[0] || "";
     const oldest = all[all.length - 1] || newest;
     const card = document.createElement("article");
     card.className = "album-card";
     card.style.setProperty("--album-color", covers[index % covers.length]);
-    card.style.setProperty("--album-angle", `${rotations[index % rotations.length]}deg`);
+    card.style.setProperty(
+      "--album-angle",
+      `${rotations[index % rotations.length]}deg`,
+    );
     const spread = document.createElement("div");
     spread.className = "album-spread";
-    spread.append(createPage(a.dates,a.photos), createPage(b.dates,b.photos));
+    spread.append(createPage(a.dates, a.photos), createPage(b.dates, b.photos));
     const caption = document.createElement("div");
     caption.className = "album-caption";
-    caption.textContent = `ALBUM ${String(index + 1).padStart(2,"0")} / ${oldest} — ${newest}`;
-    card.append(spread,caption);
+    caption.textContent = `ALBUM ${String(index + 1).padStart(2, "0")} / ${oldest} — ${newest}`;
+    card.append(spread, caption);
     rail.append(card);
   }
   rail.scrollLeft = scroll;
@@ -1826,7 +2055,6 @@ function cleanRich(html) {
   });
 }
 
-
 function setupEditorInk({ layer, box, polaroid, data }) {
   const NS = "http://www.w3.org/2000/svg";
   const ink = document.createElementNS(NS, "svg");
@@ -1869,16 +2097,25 @@ function setupEditorInk({ layer, box, polaroid, data }) {
   // Firebase memoInk: 기존 선 데이터 형식 [ [ [x,y], ... ], ... ] 유지
   // x,y는 팝업 내부 0~1 상대 좌표이며, 밖으로 나온 사진에서는 범위를 벗어날 수 있음.
   let strokes = Array.isArray(data.memoInk)
-    ? data.memoInk.slice(0, 900)
+    ? data.memoInk
+        .slice(0, 900)
         .filter(Array.isArray)
-        .map(points => points.slice(0, 1800)
-          .filter(p => Array.isArray(p) && p.length >= 2 &&
-            Number.isFinite(Number(p[0])) && Number.isFinite(Number(p[1])))
-          .map(p => [Number(p[0]), Number(p[1])]))
-        .filter(points => points.length > 0)
+        .map((points) =>
+          points
+            .slice(0, 1800)
+            .filter(
+              (p) =>
+                Array.isArray(p) &&
+                p.length >= 2 &&
+                Number.isFinite(Number(p[0])) &&
+                Number.isFinite(Number(p[1])),
+            )
+            .map((p) => [Number(p[0]), Number(p[1])]),
+        )
+        .filter((points) => points.length > 0)
     : [];
 
-  let mode = "none";  // none / pen / eraser
+  let mode = "none"; // none / pen / eraser
   let pointerId = null;
   let currentStroke = null;
   let currentPath = null;
@@ -1886,40 +2123,51 @@ function setupEditorInk({ layer, box, polaroid, data }) {
   let disposed = false;
   const ERASER_RADIUS_PX = 22; // 닿은 획 전체를 삭제하는 지우개 반경
 
-  function rect() { return box.getBoundingClientRect(); }
+  function rect() {
+    return box.getBoundingClientRect();
+  }
 
   function point(clientX, clientY) {
     const r = rect();
     return [
-      Math.round((clientX - r.left) / Math.max(1, r.width) * 10000) / 10000,
-      Math.round((clientY - r.top) / Math.max(1, r.height) * 10000) / 10000
+      Math.round(((clientX - r.left) / Math.max(1, r.width)) * 10000) / 10000,
+      Math.round(((clientY - r.top) / Math.max(1, r.height)) * 10000) / 10000,
     ];
   }
 
   function isInside(x, y) {
-    return [box, polaroid].some(el => {
+    return [box, polaroid].some((el) => {
       const r = el.getBoundingClientRect();
       return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
     });
   }
 
   function validPosition(e) {
-    return Number.isFinite(e.clientX) && Number.isFinite(e.clientY) &&
-      !(e.clientX === 0 && e.clientY === 0) && isInside(e.clientX, e.clientY);
+    return (
+      Number.isFinite(e.clientX) &&
+      Number.isFinite(e.clientY) &&
+      !(e.clientX === 0 && e.clientY === 0) &&
+      isInside(e.clientX, e.clientY)
+    );
   }
 
   // 모든 중요한 버튼은 펜/지우개보다 우선 처리
   function isControl(target) {
-    return target instanceof Element && !!target.closest(
-      ".editor-pen-toggle, .editor-eraser-toggle, " +
-      ".editor-close, .editor-actions button, .editor-btn"
+    return (
+      target instanceof Element &&
+      !!target.closest(
+        ".editor-pen-toggle, .editor-eraser-toggle, " +
+          ".editor-close, .editor-actions button, .editor-btn",
+      )
     );
   }
 
   function redrawPath(path, points) {
     if (!path || !points.length) return;
-    const d = points.map((p, i) =>
-      `${i ? "L" : "M"}${(p[0] * 1000).toFixed(2)} ${(p[1] * 1000).toFixed(2)}`);
+    const d = points.map(
+      (p, i) =>
+        `${i ? "L" : "M"}${(p[0] * 1000).toFixed(2)} ${(p[1] * 1000).toFixed(2)}`,
+    );
     if (points.length === 1) d.push("l 0.05 0.05");
     path.setAttribute("d", d.join(" "));
   }
@@ -1940,8 +2188,11 @@ function setupEditorInk({ layer, box, polaroid, data }) {
   function endGesture() {
     if (pointerId !== null) {
       try {
-        if (ink.hasPointerCapture(pointerId)) ink.releasePointerCapture(pointerId);
-      } catch (_) { /* capture가 다른 요소에 걸려있어도 무시 */ }
+        if (ink.hasPointerCapture(pointerId))
+          ink.releasePointerCapture(pointerId);
+      } catch (_) {
+        /* capture가 다른 요소에 걸려있어도 무시 */
+      }
     }
     pointerId = null;
     currentStroke = null;
@@ -1960,7 +2211,10 @@ function setupEditorInk({ layer, box, polaroid, data }) {
     pen.setAttribute("aria-pressed", String(mode === "pen"));
     eraser.setAttribute("aria-pressed", String(mode === "eraser"));
     pen.setAttribute("aria-label", mode === "pen" ? "펜 끄기" : "펜 켜기");
-    eraser.setAttribute("aria-label", mode === "eraser" ? "지우개 끄기" : "지우개 켜기");
+    eraser.setAttribute(
+      "aria-label",
+      mode === "eraser" ? "지우개 끄기" : "지우개 켜기",
+    );
     pen.title = mode === "pen" ? "펜 끄기" : "펜 켜기";
     eraser.title = mode === "eraser" ? "지우개 끄기" : "지우개 켜기";
 
@@ -1974,11 +2228,15 @@ function setupEditorInk({ layer, box, polaroid, data }) {
 
   // 점 P와 선분 AB 사이의 픽셀 거리 제곱
   function distanceSquaredToSegment(px, py, ax, ay, bx, by) {
-    const dx = bx - ax, dy = by - ay;
+    const dx = bx - ax,
+      dy = by - ay;
     const len2 = dx * dx + dy * dy;
-    const t = len2 < 0.000001 ? 0 : Math.max(0, Math.min(1,
-      ((px - ax) * dx + (py - ay) * dy) / len2));
-    const x = ax + t * dx - px, y = ay + t * dy - py;
+    const t =
+      len2 < 0.000001
+        ? 0
+        : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+    const x = ax + t * dx - px,
+      y = ay + t * dy - py;
     return x * x + y * y;
   }
 
@@ -1986,9 +2244,12 @@ function setupEditorInk({ layer, box, polaroid, data }) {
   // 선분 대 선분 충돌만 검사하고, 삭제가 발생할 때만 SVG를 다시 그림.
   function eraseBetween(from, to) {
     const r = rect();
-    const w = Math.max(1, r.width), h = Math.max(1, r.height);
-    const ax = from[0] * w, ay = from[1] * h;
-    const bx = to[0] * w, by = to[1] * h;
+    const w = Math.max(1, r.width),
+      h = Math.max(1, r.height);
+    const ax = from[0] * w,
+      ay = from[1] * h;
+    const bx = to[0] * w,
+      by = to[1] * h;
     const radius2 = ERASER_RADIUS_PX * ERASER_RADIUS_PX;
     const left = Math.min(ax, bx) - ERASER_RADIUS_PX;
     const right = Math.max(ax, bx) + ERASER_RADIUS_PX;
@@ -1998,28 +2259,39 @@ function setupEditorInk({ layer, box, polaroid, data }) {
     function intersects(x0, y0, x1, y1) {
       // 지우개 이동 선분과 획 선분이 교차하는 경우
       const cross = (ux, uy, vx, vy) => ux * vy - uy * vx;
-      const d1 = cross(bx-ax, by-ay, x0-ax, y0-ay);
-      const d2 = cross(bx-ax, by-ay, x1-ax, y1-ay);
-      const d3 = cross(x1-x0, y1-y0, ax-x0, ay-y0);
-      const d4 = cross(x1-x0, y1-y0, bx-x0, by-y0);
-      if (((d1 <= 0 && d2 >= 0) || (d1 >= 0 && d2 <= 0)) &&
-          ((d3 <= 0 && d4 >= 0) || (d3 >= 0 && d4 <= 0))) return true;
+      const d1 = cross(bx - ax, by - ay, x0 - ax, y0 - ay);
+      const d2 = cross(bx - ax, by - ay, x1 - ax, y1 - ay);
+      const d3 = cross(x1 - x0, y1 - y0, ax - x0, ay - y0);
+      const d4 = cross(x1 - x0, y1 - y0, bx - x0, by - y0);
+      if (
+        ((d1 <= 0 && d2 >= 0) || (d1 >= 0 && d2 <= 0)) &&
+        ((d3 <= 0 && d4 >= 0) || (d3 >= 0 && d4 <= 0))
+      )
+        return true;
       // 교차하지 않아도 지우개 반경 이내면 삭제
-      return distanceSquaredToSegment(x0, y0, ax, ay, bx, by) <= radius2 ||
+      return (
+        distanceSquaredToSegment(x0, y0, ax, ay, bx, by) <= radius2 ||
         distanceSquaredToSegment(x1, y1, ax, ay, bx, by) <= radius2 ||
         distanceSquaredToSegment(ax, ay, x0, y0, x1, y1) <= radius2 ||
-        distanceSquaredToSegment(bx, by, x0, y0, x1, y1) <= radius2;
+        distanceSquaredToSegment(bx, by, x0, y0, x1, y1) <= radius2
+      );
     }
 
     let changed = false;
     const remaining = [];
     for (const line of strokes) {
       if (!line.length) continue;
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
       for (const p of line) {
-        const x = p[0] * w, y = p[1] * h;
-        minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-        minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+        const x = p[0] * w,
+          y = p[1] * h;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
       }
       if (maxX < left || minX > right || maxY < top || minY > bottom) {
         remaining.push(line);
@@ -2027,12 +2299,25 @@ function setupEditorInk({ layer, box, polaroid, data }) {
       }
       let hit = false;
       if (line.length === 1) {
-        hit = distanceSquaredToSegment(line[0][0]*w, line[0][1]*h,
-          ax, ay, bx, by) <= radius2;
+        hit =
+          distanceSquaredToSegment(
+            line[0][0] * w,
+            line[0][1] * h,
+            ax,
+            ay,
+            bx,
+            by,
+          ) <= radius2;
       } else {
         for (let i = 1; i < line.length; i++) {
-          if (intersects(line[i-1][0]*w, line[i-1][1]*h,
-            line[i][0]*w, line[i][1]*h)) {
+          if (
+            intersects(
+              line[i - 1][0] * w,
+              line[i - 1][1] * h,
+              line[i][0] * w,
+              line[i][1] * h,
+            )
+          ) {
             hit = true;
             break;
           }
@@ -2050,7 +2335,8 @@ function setupEditorInk({ layer, box, polaroid, data }) {
   function down(e) {
     if (mode === "none" || disposed || isControl(e.target)) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    if (e.isPrimary === false || pointerId !== null || !validPosition(e)) return;
+    if (e.isPrimary === false || pointerId !== null || !validPosition(e))
+      return;
 
     // 텍스트 선택/글쓰기보다 펜 또는 지우개를 우선
     e.preventDefault();
@@ -2066,11 +2352,19 @@ function setupEditorInk({ layer, box, polaroid, data }) {
       eraseBetween(previousPoint, previousPoint);
     }
     // pointer가 글, 사진 위를 지나도 같은 제스처 유지
-    try { ink.setPointerCapture(pointerId); } catch (_) {}
+    try {
+      ink.setPointerCapture(pointerId);
+    } catch (_) {}
   }
 
   function move(e) {
-    if (mode === "none" || disposed || e.pointerId !== pointerId || !previousPoint) return;
+    if (
+      mode === "none" ||
+      disposed ||
+      e.pointerId !== pointerId ||
+      !previousPoint
+    )
+      return;
     e.preventDefault();
     e.stopImmediatePropagation();
 
@@ -2080,11 +2374,16 @@ function setupEditorInk({ layer, box, polaroid, data }) {
     }
     const next = point(e.clientX, e.clientY);
     const r = rect();
-    const dist = Math.hypot((next[0] - previousPoint[0]) * r.width,
-      (next[1] - previousPoint[1]) * r.height);
-    const maxJump = Math.max(130, Math.min(250, r.width * .32));
+    const dist = Math.hypot(
+      (next[0] - previousPoint[0]) * r.width,
+      (next[1] - previousPoint[1]) * r.height,
+    );
+    const maxJump = Math.max(130, Math.min(250, r.width * 0.32));
     // (0,0) 등 튀는 터치 좌표로 긴 선이 생기는 것 방지
-    if (dist > maxJump) { endGesture(); return; }
+    if (dist > maxJump) {
+      endGesture();
+      return;
+    }
 
     if (mode === "pen") {
       if (dist >= 1.8 && currentStroke && currentStroke.length < 1800) {
@@ -2104,12 +2403,18 @@ function setupEditorInk({ layer, box, polaroid, data }) {
     if (validPosition(e) && previousPoint) {
       const next = point(e.clientX, e.clientY);
       const r = rect();
-      const dist = Math.hypot((next[0] - previousPoint[0]) * r.width,
-        (next[1] - previousPoint[1]) * r.height);
-      if (dist <= Math.max(130, Math.min(250, r.width * .32))) {
+      const dist = Math.hypot(
+        (next[0] - previousPoint[0]) * r.width,
+        (next[1] - previousPoint[1]) * r.height,
+      );
+      if (dist <= Math.max(130, Math.min(250, r.width * 0.32))) {
         if (mode === "eraser") eraseBetween(previousPoint, next);
-        else if (mode === "pen" && currentStroke && dist >= 1.8 &&
-          currentStroke.length < 1800) {
+        else if (
+          mode === "pen" &&
+          currentStroke &&
+          dist >= 1.8 &&
+          currentStroke.length < 1800
+        ) {
           currentStroke.push(next);
           redrawPath(currentPath, currentStroke);
         }
@@ -2118,7 +2423,9 @@ function setupEditorInk({ layer, box, polaroid, data }) {
     endGesture();
   }
 
-  function cancel(e) { if (e.pointerId === pointerId) endGesture(); }
+  function cancel(e) {
+    if (e.pointerId === pointerId) endGesture();
+  }
 
   function interceptClick(e) {
     // 펜/지우개 ON 중에도 저장·취소·X 및 도구 버튼은 클릭 가능
@@ -2136,7 +2443,9 @@ function setupEditorInk({ layer, box, polaroid, data }) {
   document.addEventListener("click", interceptClick, true);
 
   return {
-    serialize() { return strokes.map(s => s.map(p => [...p])); },
+    serialize() {
+      return strokes.map((s) => s.map((p) => [...p]));
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -2150,7 +2459,7 @@ function setupEditorInk({ layer, box, polaroid, data }) {
       eraser.remove();
       ink.remove();
       box.classList.remove("editor-inking", "editor-erasing");
-    }
+    },
   };
 }
 
@@ -2326,7 +2635,6 @@ function openEditor(source, key) {
     node.addEventListener("wheel", blockBubble, { passive: true });
   });
 
-
   media.addEventListener("click", () => openPhotoViewer(data.image));
 
   function closeEditorWithoutSaving() {
@@ -2460,7 +2768,7 @@ function enterBatch(source, key) {
 }
 function toggleBatch(source, key) {
   if (!batchMode || source !== "locker" || busy) return;
-  const id = itemId(source,key);
+  const id = itemId(source, key);
   if (batchSelected.has(id)) batchSelected.delete(id);
   else batchSelected.add(id);
   refreshBatch();
@@ -2477,35 +2785,44 @@ function visibleCards() {
   return [...document.querySelectorAll("#album-rail .album-photo[data-key]")];
 }
 function refreshBatch() {
-  document.body.classList.toggle("batch-mode",batchMode);
+  document.body.classList.toggle("batch-mode", batchMode);
   $("batch-bar").hidden = !batchMode;
   $("archive-trash-zone").hidden = !batchMode;
   for (const el of document.querySelectorAll(".album-photo[data-key]")) {
-    el.classList.toggle("selected", batchSelected.has(itemId(el.dataset.source,el.dataset.key)));
+    el.classList.toggle(
+      "selected",
+      batchSelected.has(itemId(el.dataset.source, el.dataset.key)),
+    );
   }
   $("batch-count").textContent = `${batchSelected.size}개 선택됨`;
   const cards = visibleCards();
-  $("batch-all").textContent = cards.length && cards.every(el => batchSelected.has(itemId("locker",el.dataset.key)))
-    ? "전체 해제" : "전체 선택";
+  $("batch-all").textContent =
+    cards.length &&
+    cards.every((el) => batchSelected.has(itemId("locker", el.dataset.key)))
+      ? "전체 해제"
+      : "전체 선택";
   $("batch-date").disabled = batchSelected.size === 0 || busy;
   $("archive-trash-count").textContent = `${batchSelected.size}장`;
 }
 function toggleAll() {
   if (busy) return;
   const cards = visibleCards();
-  const all = cards.length && cards.every(el => batchSelected.has(itemId("locker",el.dataset.key)));
+  const all =
+    cards.length &&
+    cards.every((el) => batchSelected.has(itemId("locker", el.dataset.key)));
   for (const card of cards) {
-    const id = itemId("locker",card.dataset.key);
+    const id = itemId("locker", card.dataset.key);
     if (all) batchSelected.delete(id);
     else batchSelected.add(id);
   }
   refreshBatch();
 }
 function selectedItems() {
-  return [...batchSelected].map(splitId).filter(item =>
-    item.source === "locker" && record("locker",item.key));
+  return [...batchSelected]
+    .map(splitId)
+    .filter((item) => item.source === "locker" && record("locker", item.key));
 }
-function isInArchiveTrash(x,y) {
+function isInArchiveTrash(x, y) {
   const r = $("archive-trash-zone").getBoundingClientRect();
   return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
 }
@@ -2519,7 +2836,9 @@ function setupArchiveBatchDrag() {
   let ghost = null;
 
   function trashContains(x, y) {
-    return batchMode && !$("archive-trash-zone").hidden && isInArchiveTrash(x, y);
+    return (
+      batchMode && !$("archive-trash-zone").hidden && isInArchiveTrash(x, y)
+    );
   }
 
   function updateDrag(x, y) {
@@ -2558,7 +2877,10 @@ function setupArchiveBatchDrag() {
     document.body.append(ghost);
     document.body.classList.add("batch-dragging");
     for (const card of visibleCards()) {
-      card.classList.toggle("is-drag-source", batchSelected.has(itemId("locker", card.dataset.key)));
+      card.classList.toggle(
+        "is-drag-source",
+        batchSelected.has(itemId("locker", card.dataset.key)),
+      );
     }
     updateDrag(x, y);
   }
@@ -2574,9 +2896,12 @@ function setupArchiveBatchDrag() {
   }
 
   rail.addEventListener("pointerdown", (event) => {
-    const photo = event.target instanceof Element
-      ? event.target.closest(".album-photo[data-key]") : null;
-    if (!photo || busy || (event.pointerType === "mouse" && event.button !== 0)) return;
+    const photo =
+      event.target instanceof Element
+        ? event.target.closest(".album-photo[data-key]")
+        : null;
+    if (!photo || busy || (event.pointerType === "mouse" && event.button !== 0))
+      return;
     session = {
       pointerId: event.pointerId,
       key: photo.dataset.key,
@@ -2587,14 +2912,20 @@ function setupArchiveBatchDrag() {
   });
 
   rail.addEventListener("pointermove", (event) => {
-    if (!session || session.pointerId !== event.pointerId || busy || !batchMode) return;
+    if (!session || session.pointerId !== event.pointerId || busy || !batchMode)
+      return;
     if (!batchSelected.has(itemId("locker", session.key))) return;
 
-    const moved = Math.hypot(event.clientX - session.startX, event.clientY - session.startY);
+    const moved = Math.hypot(
+      event.clientX - session.startX,
+      event.clientY - session.startY,
+    );
     if (!session.dragging && moved > 10) {
       session.dragging = true;
       archiveDragSuppressUntil = performance.now() + 600;
-      try { rail.setPointerCapture(event.pointerId); } catch (_) {}
+      try {
+        rail.setPointerCapture(event.pointerId);
+      } catch (_) {}
       createGhost(event.clientX, event.clientY);
     }
     if (session.dragging) {
@@ -2605,12 +2936,15 @@ function setupArchiveBatchDrag() {
 
   function finish(event) {
     if (!session || session.pointerId !== event.pointerId) return;
-    const dropped = session.dragging && event.type === "pointerup" &&
+    const dropped =
+      session.dragging &&
+      event.type === "pointerup" &&
       trashContains(event.clientX, event.clientY);
     const dragged = session.dragging;
     session = null;
     try {
-      if (rail.hasPointerCapture(event.pointerId)) rail.releasePointerCapture(event.pointerId);
+      if (rail.hasPointerCapture(event.pointerId))
+        rail.releasePointerCapture(event.pointerId);
     } catch (_) {}
     if (dragged) archiveDragSuppressUntil = performance.now() + 650;
     clearDrag();
@@ -2630,8 +2964,8 @@ async function deleteArchiveSelectionAt(x, y) {
   busy = true;
   refreshBatch();
 
-  const keys = new Set(chosen.map(item => item.key));
-  const nodes = visibleCards().filter(photo => keys.has(photo.dataset.key));
+  const keys = new Set(chosen.map((item) => item.key));
+  const nodes = visibleCards().filter((photo) => keys.has(photo.dataset.key));
 
   // 인화실과 동일한 흰색 삼각형 파기 이펙트.
   // 여러 장일 때는 2~3번 겹쳐 퍼지도록 하되 과도한 연산은 막음.
@@ -2641,16 +2975,27 @@ async function deleteArchiveSelectionAt(x, y) {
   }
   for (const node of nodes) {
     node.style.pointerEvents = "none";
-    node.animate([
-      { opacity: 1, filter: "blur(0px)", transform: getComputedStyle(node).transform },
-      { opacity: 0, filter: "blur(5px)", transform: "translateY(14px) rotate(9deg) scale(.72)" }
-    ], { duration: 900, easing: "ease-out", fill: "forwards" });
+    node.animate(
+      [
+        {
+          opacity: 1,
+          filter: "blur(0px)",
+          transform: getComputedStyle(node).transform,
+        },
+        {
+          opacity: 0,
+          filter: "blur(5px)",
+          transform: "translateY(14px) rotate(9deg) scale(.72)",
+        },
+      ],
+      { duration: 900, easing: "ease-out", fill: "forwards" },
+    );
   }
 
   // 이펙트를 보여준 다음 Firebase의 선택한 사진을 삭제.
-  await new Promise(resolve => setTimeout(resolve, 950));
+  await new Promise((resolve) => setTimeout(resolve, 950));
   const results = await Promise.allSettled(
-    chosen.map(item => db.ref("saved_memos").child(item.key).remove())
+    chosen.map((item) => db.ref("saved_memos").child(item.key).remove()),
   );
   let removed = 0;
   results.forEach((result, index) => {
@@ -2665,9 +3010,11 @@ async function deleteArchiveSelectionAt(x, y) {
   drawAlbums();
   if (!batchSelected.size) leaveBatch();
   else refreshBatch();
-  toast(removed === chosen.length
-    ? `${removed}장의 사진을 파기했어요.`
-    : `${removed}장 삭제, ${chosen.length - removed}장 실패. 다시 시도해 주세요.`);
+  toast(
+    removed === chosen.length
+      ? `${removed}장의 사진을 파기했어요.`
+      : `${removed}장 삭제, ${chosen.length - removed}장 실패. 다시 시도해 주세요.`,
+  );
 }
 
 async function batchChangeDate() {
@@ -2677,18 +3024,29 @@ async function batchChangeDate() {
   if (date === null) return;
   busy = true;
   let changed = 0;
-  for (const {key} of chosen) {
-    const data = record("locker",key);
+  for (const { key } of chosen) {
+    const data = record("locker", key);
     if (!data) continue;
     const old = new Date(memoTime(data));
     const day = new Date(date);
-    const newAt = new Date(day.getFullYear(),day.getMonth(),day.getDate(),
-      old.getHours(),old.getMinutes(),old.getSeconds()).getTime();
+    const newAt = new Date(
+      day.getFullYear(),
+      day.getMonth(),
+      day.getDate(),
+      old.getHours(),
+      old.getMinutes(),
+      old.getSeconds(),
+    ).getTime();
     try {
-      await db.ref("saved_memos").child(key).update({capturedAt:newAt,dateSource:"manual"});
+      await db
+        .ref("saved_memos")
+        .child(key)
+        .update({ capturedAt: newAt, dateSource: "manual" });
       changed++;
-      batchSelected.delete(itemId("locker",key));
-    } catch(e) {console.error(e);}
+      batchSelected.delete(itemId("locker", key));
+    } catch (e) {
+      console.error(e);
+    }
   }
   busy = false;
   if (!batchSelected.size) leaveBatch();
@@ -2712,13 +3070,21 @@ function setupArchivePhotoSwing() {
 
   function run(now) {
     frame = 0;
-    const dt = lastFrameTime ? Math.min((now - lastFrameTime) / 1000, 0.035) : 1 / 60;
+    const dt = lastFrameTime
+      ? Math.min((now - lastFrameTime) / 1000, 0.035)
+      : 1 / 60;
     lastFrameTime = now;
     const archiveVisible = document.body.classList.contains("archive-open");
 
     for (const photo of moving) {
       const state = states.get(photo);
-      if (!state || !photo.isConnected || !visible.has(photo) || !archiveVisible || reduced.matches) {
+      if (
+        !state ||
+        !photo.isConnected ||
+        !visible.has(photo) ||
+        !archiveVisible ||
+        reduced.matches
+      ) {
         photo.classList.remove("is-swinging");
         photo.style.removeProperty("--swing-angle");
         moving.delete(photo);
@@ -2744,7 +3110,12 @@ function setupArchivePhotoSwing() {
   }
 
   function nudge(photo, velocity) {
-    if (!visible.has(photo) || reduced.matches || !document.body.classList.contains("archive-open")) return;
+    if (
+      !visible.has(photo) ||
+      reduced.matches ||
+      !document.body.classList.contains("archive-open")
+    )
+      return;
     const state = states.get(photo);
     if (!state) return;
     state.velocity = Math.max(-90, Math.min(90, state.velocity + velocity));
@@ -2753,21 +3124,24 @@ function setupArchivePhotoSwing() {
     if (!frame) frame = requestAnimationFrame(run);
   }
 
-  const observer = new IntersectionObserver((entries) => {
-    for (const entry of entries) {
-      const photo = entry.target;
-      if (entry.isIntersecting) {
-        visible.add(photo);
-        // A small one-time swing when an album comes into view.
-        if (!states.get(photo).introduced) {
-          states.get(photo).introduced = true;
-          nudge(photo, 33);
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        const photo = entry.target;
+        if (entry.isIntersecting) {
+          visible.add(photo);
+          // A small one-time swing when an album comes into view.
+          if (!states.get(photo).introduced) {
+            states.get(photo).introduced = true;
+            nudge(photo, 33);
+          }
+        } else {
+          visible.delete(photo);
         }
-      } else {
-        visible.delete(photo);
       }
-    }
-  }, { root: rail, rootMargin: "0px 65px", threshold: 0 });
+    },
+    { root: rail, rootMargin: "0px 65px", threshold: 0 },
+  );
 
   function watchCards() {
     // drawAlbums() may replace the whole rail: release old DOM references.
@@ -2791,20 +3165,37 @@ function setupArchivePhotoSwing() {
   watchCards();
 
   // Scrolling moves the album; inertia makes the photos sway the other way.
-  rail.addEventListener("scroll", () => {
-    const delta = rail.scrollLeft - previousScroll;
-    previousScroll = rail.scrollLeft;
-    if (Math.abs(delta) < 0.4) return;
-    const push = Math.max(-65, Math.min(65, -delta * 1.8));
-    for (const photo of visible) nudge(photo, push);
-  }, { passive: true });
+  rail.addEventListener(
+    "scroll",
+    () => {
+      const delta = rail.scrollLeft - previousScroll;
+      previousScroll = rail.scrollLeft;
+      if (Math.abs(delta) < 0.4) return;
+      const push = Math.max(-65, Math.min(65, -delta * 1.8));
+      for (const photo of visible) nudge(photo, push);
+    },
+    { passive: true },
+  );
 
   // A tap or hold causes a tiny wiggle but does not block normal photo editing.
-  rail.addEventListener("pointerdown", (event) => {
-    const photo = event.target instanceof Element
-      ? event.target.closest(".album-photo") : null;
-    if (photo) nudge(photo, event.clientX < photo.getBoundingClientRect().left + photo.clientWidth / 2 ? -48 : 48);
-  }, { passive: true });
+  rail.addEventListener(
+    "pointerdown",
+    (event) => {
+      const photo =
+        event.target instanceof Element
+          ? event.target.closest(".album-photo")
+          : null;
+      if (photo)
+        nudge(
+          photo,
+          event.clientX <
+            photo.getBoundingClientRect().left + photo.clientWidth / 2
+            ? -48
+            : 48,
+        );
+    },
+    { passive: true },
+  );
 }
 
 // -------------------------------------------------------------------
@@ -2824,6 +3215,8 @@ function init() {
   // 예전 좌우 이동 버튼을 제거했더라도 오류가 나지 않게 함
   $("archive-tab").onclick = () => setArchive(true);
   $("archive-close").onclick = () => setArchive(false);
+  $("archive-month-back").onclick = showArchiveBookshelf;
+  syncArchiveBookcaseView();
   $("camera-btn").onclick = () => $("camera-input").click();
   $("gallery-btn").onclick = () => $("gallery-input").click();
   for (const id of ["camera-input", "gallery-input"]) {
@@ -2834,13 +3227,9 @@ function init() {
       await uploadFiles(files);
     };
   }
-  $("archive-search").oninput = drawAlbums;
-  $("archive-date").onchange = drawAlbums;
-  $("archive-reset").onclick = () => {
-    $("archive-search").value = "";
-    $("archive-date").value = "";
-    drawAlbums();
-  };
+  $("archive-search").oninput = searchArchiveAcrossMonths;
+  $("archive-date").onchange = searchArchiveAcrossMonths;
+  $("archive-reset").onclick = showArchiveAll;
   $("viewer-close").onclick = closePhotoViewer;
   $("batch-all").onclick = toggleAll;
   $("batch-cancel").onclick = leaveBatch;

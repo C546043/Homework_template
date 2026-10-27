@@ -18,7 +18,7 @@ if (mount && cover) {
     const renderer = new THREE.WebGLRenderer({
       alpha: true,
       antialias: true,
-      powerPreference: "high-performance",
+      powerPreference: "high-performance"
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.setClearColor(0xffffff, 0);
@@ -55,7 +55,7 @@ if (mount && cover) {
       thickness: 0.35,
       clearcoat: 1,
       clearcoatRoughness: 0.07,
-      envMapIntensity: 1.55,
+      envMapIntensity: 1.55
     });
 
     const clearGlass = new THREE.MeshPhysicalMaterial({
@@ -68,34 +68,34 @@ if (mount && cover) {
       thickness: 0.7,
       clearcoat: 1,
       clearcoatRoughness: 0.035,
-      envMapIntensity: 1.4,
+      envMapIntensity: 1.4
     });
 
     const cobalt = new THREE.MeshPhysicalMaterial({
       color: 0x2454ef,
       metalness: 0.12,
       roughness: 0.23,
-      clearcoat: 0.9,
+      clearcoat: 0.9
     });
     const paper = new THREE.MeshStandardMaterial({
       color: 0xf4f6fc,
       roughness: 0.91,
       metalness: 0,
-      side: THREE.DoubleSide,
+      side: THREE.DoubleSide
     });
     const edgeBlue = new THREE.MeshStandardMaterial({
       color: 0xb7c9f8,
       roughness: 0.75,
-      side: THREE.DoubleSide,
+      side: THREE.DoubleSide
     });
     const metal = new THREE.MeshStandardMaterial({
       color: 0x7599e2,
       metalness: 0.56,
-      roughness: 0.22,
+      roughness: 0.22
     });
     const white = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      roughness: 0.85,
+      roughness: 0.85
     });
 
     // 4. Group for all objects
@@ -114,7 +114,7 @@ if (mount && cover) {
       // Solid book spine: clearly identifies this object as a book.
       const spine = new THREE.Mesh(
         new RoundedBoxGeometry(0.18, 3.31, 0.27, 4, 0.04),
-        cobalt,
+        cobalt
       );
       spine.position.set(spineX - 0.04, 0, -0.05);
       book.add(spine);
@@ -124,7 +124,7 @@ if (mount && cover) {
       backPivot.position.set(spineX, 0, -0.13);
       const backCover = new THREE.Mesh(
         new RoundedBoxGeometry(2.34, 3.28, 0.09, 4, 0.045),
-        blueGlass,
+        blueGlass
       );
       backCover.position.x = 2.34 / 2;
       backPivot.add(backCover);
@@ -139,7 +139,7 @@ if (mount && cover) {
 
         const sheet = new THREE.Mesh(
           new RoundedBoxGeometry(pageWidth, pageHeight, 0.018, 3, 0.014),
-          paper,
+          paper
         );
         sheet.position.x = pageWidth / 2;
         pivot.add(sheet);
@@ -147,7 +147,7 @@ if (mount && cover) {
         // A faint blue line near each page's outer edge creates definition.
         const edge = new THREE.Mesh(
           new THREE.BoxGeometry(0.018, pageHeight - 0.13, 0.023),
-          edgeBlue,
+          edgeBlue
         );
         edge.position.set(pageWidth - 0.065, 0, 0.009);
         pivot.add(edge);
@@ -166,7 +166,7 @@ if (mount && cover) {
       frontPivot.position.set(spineX, 0, 0.08);
       const frontCover = new THREE.Mesh(
         new RoundedBoxGeometry(2.38, 3.29, 0.105, 4, 0.05),
-        blueGlass,
+        blueGlass
       );
       frontCover.position.x = 2.38 / 2;
       frontPivot.add(frontCover);
@@ -177,8 +177,8 @@ if (mount && cover) {
         new THREE.LineBasicMaterial({
           color: 0x7099ff,
           transparent: true,
-          opacity: 0.62,
-        }),
+          opacity: 0.62
+        })
       );
       border.position.copy(frontCover.position);
       frontPivot.add(border);
@@ -199,6 +199,7 @@ if (mount && cover) {
     heroBook.scale.setScalar(1.8);
     stage.add(heroBook);
 
+
     // Independent 3D drop-book; attached to the darkroom's local coordinates.
     function setupMemoDropBook() {
       const zone = document.getElementById("memo-drop-zone");
@@ -207,141 +208,107 @@ if (mount && cover) {
       try {
         const bookScene = new THREE.Scene();
         bookScene.environment = scene.environment;
-        bookScene.add(new THREE.AmbientLight(0xffffff, 1.45));
-        const light = new THREE.DirectionalLight(0xffffff, 2.1);
-        light.position.set(-3, 8, 6);
-        bookScene.add(light);
-        const fill = new THREE.DirectionalLight(0xcfe0ff, 1);
-        fill.position.set(4, 5, -3);
-        bookScene.add(fill);
+        bookScene.add(new THREE.AmbientLight(0xffffff,1.45));
+        const light = new THREE.DirectionalLight(0xffffff,2.1);
+        light.position.set(-3,8,6); bookScene.add(light);
+        const fill = new THREE.DirectionalLight(0xcfe0ff,1);
+        fill.position.set(4,5,-3); bookScene.add(fill);
         const lowerBook = heroBook.clone(true);
         bookScene.add(lowerBook);
         const spine = lowerBook.children[0];
         const back = lowerBook.children[1];
-        const leaves = lowerBook.children.slice(2, 8);
+        const leaves = lowerBook.children.slice(2,8);
         const front = lowerBook.children[8];
-        if (!spine || !back || leaves.length !== 6 || !front)
-          throw new Error("책 파츠 구조 오류");
-        const BOOK_SCALE = 1.12;
+        if (!spine || !back || leaves.length!==6 || !front) throw new Error("책 파츠 구조 오류");
+        const BOOK_SCALE=1.12;
         lowerBook.scale.setScalar(BOOK_SCALE);
-        const BASE_Y = -0.42;
-        lowerBook.position.set(0.92, BASE_Y, -0.05);
+        const BASE_Y=-0.42;
+        lowerBook.position.set(.92,BASE_Y,-.05);
         // User-approved resting angle; do not modify.
-        lowerBook.rotation.set(-2.5, 0, 0);
-        const hingeX = back.position.x;
-        spine.position.set(hingeX - 0.04, 0, -0.22);
-        spine.scale.set(0.58, 0.91, 0.55);
-        back.position.z = -0.25;
-        front.position.z = -0.24;
-        const restAngles = [
-          -0.3,
-          -0.25,
-          -0.2,
-          -Math.PI + 0.2,
-          -Math.PI + 0.25,
-          -Math.PI + 0.3,
-        ];
-        leaves.forEach((leaf, i) => leaf.rotation.set(0, restAngles[i], 0));
-        back.rotation.set(0, -0.1, 0);
-        front.rotation.set(0, -Math.PI + 0.1, 0);
+        lowerBook.rotation.set(-2.5,0,0);
+        const hingeX=back.position.x;
+        spine.position.set(hingeX-.04,0,-.22);
+        spine.scale.set(.58,.91,.55);
+        back.position.z=-.25;
+        front.position.z=-.24;
+        const restAngles=[-.30,-.25,-.20,-Math.PI+.20,-Math.PI+.25,-Math.PI+.30];
+        leaves.forEach((leaf,i)=>leaf.rotation.set(0,restAngles[i],0));
+        back.rotation.set(0,-.10,0);
+        front.rotation.set(0,-Math.PI+.10,0);
 
         // Overlapping page flips: start every 0.5 s, each lasts the previous 0.84 s.
-        const flips = Array.from({ length: 3 }, (_, i) => {
-          const obj = leaves[4].clone(true); // LEFT-side page is at about -PI.
-          obj.visible = false;
+        const flips = Array.from({length:3},(_,i)=>{
+          const obj=leaves[4].clone(true); // LEFT-side page is at about -PI.
+          obj.visible=false;
           obj.position.copy(leaves[4].position);
-          obj.position.z += 0.03 + i * 0.007;
+          obj.position.z += .03 + i*.007;
           lowerBook.add(obj);
-          return { obj, start: -Infinity };
+          return {obj,start:-Infinity};
         });
-        const camera2 = new THREE.OrthographicCamera(-4, 4, 2, -2, 0.1, 60);
-        camera2.position.set(0, 10.5, 6.2);
-        camera2.lookAt(0, -0.5, 0);
-        const renderer2 = new THREE.WebGLRenderer({
-          alpha: true,
-          antialias: true,
-          powerPreference: "low-power",
-        });
-        renderer2.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-        renderer2.setClearColor(0xffffff, 0);
-        renderer2.outputColorSpace = THREE.SRGBColorSpace;
-        renderer2.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer2.toneMappingExposure = 0.95;
+        const camera2=new THREE.OrthographicCamera(-4,4,2,-2,.1,60);
+        camera2.position.set(0,10.5,6.2);
+        camera2.lookAt(0,-.5,0);
+        const renderer2=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:"low-power"});
+        renderer2.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
+        renderer2.setClearColor(0xffffff,0);
+        renderer2.outputColorSpace=THREE.SRGBColorSpace;
+        renderer2.toneMapping=THREE.ACESFilmicToneMapping;
+        renderer2.toneMappingExposure=.95;
         host.replaceChildren(renderer2.domElement);
         function resizeBook() {
-          const width = Math.max(1, host.clientWidth),
-            height = Math.max(1, host.clientHeight);
-          const aspect = width / height;
-          const halfWidth = Math.max(4.2, 1.95 * aspect);
-          camera2.left = -halfWidth;
-          camera2.right = halfWidth;
-          camera2.top = halfWidth / aspect;
-          camera2.bottom = -halfWidth / aspect;
+          const width=Math.max(1,host.clientWidth),height=Math.max(1,host.clientHeight);
+          const aspect=width/height;
+          const halfWidth=Math.max(4.2,1.95*aspect);
+          camera2.left=-halfWidth;camera2.right=halfWidth;
+          camera2.top=halfWidth/aspect;camera2.bottom=-halfWidth/aspect;
           camera2.updateProjectionMatrix();
-          renderer2.setSize(width, height, false);
+          renderer2.setSize(width,height,false);
         }
-        resizeBook();
-        window.addEventListener("resize", resizeBook);
-        let fold = 0,
-          last = 0,
-          nextTurn = 0,
-          turnNo = 0,
-          wasHover = false;
-        const TURN_GAP_MS = 500;
-        const TURN_DURATION_MS = 840; // same leaf motion time as before
+        resizeBook();window.addEventListener("resize",resizeBook);
+        let fold=0,last=0,nextTurn=0,turnNo=0,wasHover=false;
+        const TURN_GAP_MS=500;
+        const TURN_DURATION_MS=840; // same leaf motion time as before
         function animateMemoBook(ms) {
           requestAnimationFrame(animateMemoBook);
-          if (document.hidden) {
-            last = ms;
-            return;
-          }
-          const dt = last ? Math.min((ms - last) / 1000, 0.05) : 1 / 60;
-          last = ms;
-          const hovered = zone.classList.contains("is-over");
-          fold += ((hovered ? 1 : 0) - fold) * (1 - Math.exp(-18 * dt));
-          leaves.forEach((leaf, i) => {
-            leaf.rotation.y = restAngles[i] + (i < 3 ? -0.23 : 0.23) * fold;
+          if (document.hidden) {last=ms;return;}
+          const dt=last?Math.min((ms-last)/1000,.05):1/60;
+          last=ms;
+          const hovered=zone.classList.contains("is-over");
+          fold += ((hovered?1:0)-fold)*(1-Math.exp(-18*dt));
+          leaves.forEach((leaf,i)=>{
+            leaf.rotation.y=restAngles[i]+(i<3?-.23:.23)*fold;
           });
-          back.rotation.y = -0.1 - 0.045 * fold;
-          front.rotation.y = -Math.PI + 0.1 + 0.045 * fold;
-          lowerBook.position.y = BASE_Y + 0.025 * fold;
-          if (hovered && !wasHover) {
-            nextTurn = ms;
-            turnNo = 0;
-          }
+          back.rotation.y=-.10-.045*fold;
+          front.rotation.y=-Math.PI+.10+.045*fold;
+          lowerBook.position.y=BASE_Y+.025*fold;
+          if (hovered && !wasHover) {nextTurn=ms;turnNo=0;}
           if (hovered) {
             // schedule using timestamps, NOT faster page rotation
-            if (ms >= nextTurn) {
-              const f = flips[turnNo % flips.length];
-              f.start = ms;
-              nextTurn = ms + TURN_GAP_MS;
+            if (ms>=nextTurn) {
+              const f=flips[turnNo%flips.length];
+              f.start=ms;
+              nextTurn=ms+TURN_GAP_MS;
               turnNo++;
             }
           } else {
-            for (const f of flips) {
-              f.start = -Infinity;
-              f.obj.visible = false;
-            }
+            for (const f of flips) {f.start=-Infinity;f.obj.visible=false;}
           }
-          wasHover = hovered;
+          wasHover=hovered;
           for (const f of flips) {
-            const p = (ms - f.start) / TURN_DURATION_MS;
-            if (!hovered || p < 0 || p >= 1) {
-              f.obj.visible = false;
-              continue;
-            }
-            const ease = p * p * (3 - 2 * p);
+            const p=(ms-f.start)/TURN_DURATION_MS;
+            if (!hovered || p<0 || p>=1) {f.obj.visible=false;continue;}
+            const ease=p*p*(3-2*p);
             // LEFT (-PI) --> RIGHT (0), opposite of previous direction.
-            const from = -Math.PI + 0.25 + 0.23 * fold;
-            const to = -0.25 - 0.23 * fold;
-            f.obj.rotation.set(0, THREE.MathUtils.lerp(from, to, ease), 0);
-            f.obj.visible = true;
+            const from=-Math.PI+.25+.23*fold;
+            const to=-.25-.23*fold;
+            f.obj.rotation.set(0,THREE.MathUtils.lerp(from,to,ease),0);
+            f.obj.visible=true;
           }
-          renderer2.render(bookScene, camera2);
+          renderer2.render(bookScene,camera2);
         }
         requestAnimationFrame(animateMemoBook);
-      } catch (err) {
-        console.error("인화실 메모 책 생성 실패", err);
+      } catch(err) {
+        console.error("인화실 메모 책 생성 실패",err);
       }
     }
     setupMemoDropBook();
@@ -352,14 +319,14 @@ if (mount && cover) {
     // Independent glass ball + ring, AWAY from the book cover.
     const orb = new THREE.Mesh(
       new THREE.SphereGeometry(0.34, 32, 24),
-      clearGlass,
+      clearGlass
     );
     orb.position.set(-3.3, 2.05, 0.6);
     stage.add(orb);
 
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(0.56, 0.025, 12, 70),
-      metal,
+      metal
     );
     ring.position.set(-3.6, 2.3, 0.15);
     ring.rotation.set(0.5, 0.4, 0.25);
@@ -391,9 +358,7 @@ if (mount && cover) {
     cover.classList.add("three-ready");
 
     // 7. Slow, controlled floating/fan motion
-    const reduceMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const mobile = window.matchMedia("(pointer: coarse)").matches;
     let lastFrame = 0;
 
@@ -407,10 +372,10 @@ if (mount && cover) {
       if (!reduceMotion) {
         heroBook.position.y = BOOK_BASE_Y + Math.sin(t * 0.75) * 0.085;
         heroBook.rotation.x = -0.29 + Math.sin(t * 0.32) * 0.018;
-        heroBook.rotation.y = 0.08 + Math.cos(t * 0.3) * 0.03;
+        heroBook.rotation.y = 0.08 + Math.cos(t * 0.30) * 0.03;
         heroBook.rotation.z = 0.08 + Math.sin(t * 0.36) * 0.018;
 
-        orb.position.y = 2.05 + Math.cos(t * 0.68) * 0.1;
+        orb.position.y = 2.05 + Math.cos(t * 0.68) * 0.10;
         ring.rotation.z = 0.25 + t * 0.04;
       }
       // 길게 이어진 표지-인화실 가로 이동에 맞춰 책이 완전히 펼쳐짐.
@@ -419,19 +384,16 @@ if (mount && cover) {
       const coverProgress = THREE.MathUtils.clamp(progress * 1.4, 0, 1);
       const smooth = coverProgress * coverProgress * (3 - 2 * coverProgress);
       pagePivots.forEach((pivot, i) => {
-        const local = THREE.MathUtils.clamp(progress * 2.17 - i * 0.1, 0, 1);
+        const local = THREE.MathUtils.clamp(progress * 2.17 - i * 0.10, 0, 1);
         const eased = local * local * (3 - 2 * local);
-        const openAngle = -0.22 - i * 0.4;
-        pivot.rotation.y =
-          THREE.MathUtils.lerp(pivot.userData.baseAngle, openAngle, eased) +
-          (reduceMotion
-            ? 0
-            : Math.sin(t * 0.95 - i * 0.31) * 0.015 * (1 - eased));
+        const openAngle = -0.22 - i * 0.40;
+        pivot.rotation.y = THREE.MathUtils.lerp(pivot.userData.baseAngle, openAngle, eased)
+          + (reduceMotion ? 0 : Math.sin(t * 0.95 - i * 0.31) * 0.015 * (1 - eased));
         pivot.rotation.z = pivot.userData.baseZ;
       });
-      frontPivot.rotation.y =
-        THREE.MathUtils.lerp(frontPivot.userData.baseAngle, -2.85, smooth) +
-        (reduceMotion ? 0 : Math.sin(t * 0.7) * 0.02 * (1 - smooth));
+      frontPivot.rotation.y = THREE.MathUtils.lerp(
+        frontPivot.userData.baseAngle, -2.85, smooth
+      ) + (reduceMotion ? 0 : Math.sin(t * .7) * .02 * (1 - smooth));
       renderer.render(scene, camera);
     }
     requestAnimationFrame(animate);
