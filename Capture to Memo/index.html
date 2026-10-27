@@ -170,7 +170,7 @@
       }
       #cover-title {
         position: absolute;
-        top: 26%;
+        top: 20%;
         left: 6.3%;
         z-index: 5;
         width: 48%;
@@ -206,35 +206,58 @@
         font-weight: 440;
         letter-spacing: -0.02em;
       }
+
       .cover-controls {
         position: absolute;
         left: 6.3%;
-        bottom: 11.2%;
+        bottom: 16%;
         z-index: 12;
+
         display: flex;
         flex-wrap: wrap;
-        gap: 12px;
         align-items: center;
+        gap: 14px;
       }
+
       .pill {
-        border: 1px solid #dbe2f1;
+        min-height: 58px;
+        padding: 16px 28px;
+
+        border: 1px solid rgba(190, 203, 231, 0.8);
         border-radius: 100px;
-        white-space: nowrap;
-        padding: 14px 24px;
-        background: rgba(255, 255, 255, 0.87);
+
+        background: rgba(255, 255, 255, 0.94);
+        color: #273454;
+
+        font-size: 16px;
         font-weight: 750;
-        font-size: 14px;
-        color: #1b2747;
-        box-shadow: 0 9px 24px rgba(36, 60, 125, 0.07);
+        white-space: nowrap;
+
+        box-shadow: 0 10px 28px rgba(36, 60, 125, 0.1);
+
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease,
+          background 0.2s ease;
       }
+
+      /* 촬영하기: 메인 버튼 */
       .pill.primary {
-        color: white;
-        background: var(--blue);
-        border-color: var(--blue);
+        color: #fff;
+        background: linear-gradient(135deg, #7078ff 0%, #5558e9 100%);
+
+        border-color: rgba(96, 101, 239, 0.8);
+
+        box-shadow:
+          0 12px 30px rgba(83, 89, 224, 0.26),
+          inset 0 1px 0 rgba(255, 255, 255, 0.32);
       }
+
       .pill:hover {
-        filter: brightness(0.97);
+        transform: translateY(-3px);
+        box-shadow: 0 15px 32px rgba(67, 82, 167, 0.2);
       }
+
       /* 3 real photographs: translucent acrylic polaroids. NO pins. */
       #cover-photo-floats {
         position: absolute;
