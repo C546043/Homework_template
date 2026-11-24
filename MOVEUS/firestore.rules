@@ -1,0 +1,45 @@
+// Firebase 콘솔 → Firestore Database → Rules에 복사합니다.
+// 아래 두 UID는 사용자가 제공한 Firebase Authentication 계정 ID로 설정되어 있습니다.
+// 이 규칙이 없으면 GitHub에서 JS 파일을 수정하는 것만으로는 접근 제한이 되지 않습니다.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function familyMember() {
+      return request.auth != null &&
+        (request.auth.uid == 'FcHfY0h8p9ZYewWix493Ras1gdq1' || request.auth.uid == 'sW35qMSUp7XzbqO37FeDzBPqlek2');
+    }
+    function familyProfileId(userId) {
+      return userId == 'FcHfY0h8p9ZYewWix493Ras1gdq1' || userId == 'sW35qMSUp7XzbqO37FeDzBPqlek2';
+    }
+    function validProgress() {
+      return request.resource.data.keys().hasOnly([
+          'version','completedThrough','activeDay','exerciseLabel',
+          'countLabel','stageProgress','updatedAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'version','completedThrough','activeDay','exerciseLabel',
+          'countLabel','stageProgress','updatedAt'
+        ]) &&
+        request.resource.data.version == 15 &&
+        request.resource.data.completedThrough is int &&
+        request.resource.data.completedThrough >= 0 &&
+        request.resource.data.completedThrough <= 9999 &&
+        request.resource.data.activeDay is int &&
+        request.resource.data.activeDay == request.resource.data.completedThrough + 1 &&
+        request.resource.data.exerciseLabel is string &&
+        request.resource.data.exerciseLabel.size() <= 60 &&
+        request.resource.data.countLabel is string &&
+        request.resource.data.countLabel.size() <= 60 &&
+        (request.resource.data.stageProgress == null || request.resource.data.stageProgress is map) &&
+        request.resource.data.updatedAt is timestamp;
+    }
+    match /progress/{userId} {
+      allow get: if familyMember() && familyProfileId(userId);
+      allow list: if false;
+      allow create: if familyMember() && request.auth.uid == userId && validProgress();
+      allow update: if familyMember() && request.auth.uid == userId && validProgress() &&
+        request.resource.data.completedThrough >= resource.data.completedThrough;
+      allow delete: if false;
+    }
+  }
+}

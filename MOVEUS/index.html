@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>MOVE:US | Pixel Workout Adventure</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- 11단계: 주간 길 3종 순환 + 실제 운동 이름 표시. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <script src="https://unpkg.com/ml5@1/dist/ml5.js"></script>
+</head>
+<body>
+  <main id="game-root" aria-label="MOVE:US 게임">
+    <!-- 픽셀 게임: 브라우저 창 전체를 차지합니다. -->
+    <div id="game-container"></div>
+
+    <!-- 화면 오른쪽 위: 선택하면 진짜 브라우저 전체 화면 모드로 전환합니다. -->
+    <button type="button" id="fullscreen-button" class="corner-button" title="브라우저 전체 화면 전환">⛶ FULLSCREEN</button>
+
+
+    <!-- STEP 15: 두 사람용 로그인 및 상대방 진행도 -->
+    <div id="family-account" class="family-account hidden" aria-live="polite">
+      <span id="family-account-name">ME</span>
+      <span id="family-sync-state">연결 중</span>
+      <button type="button" id="family-open-progress" class="family-tiny-button" aria-label="엄마와 나의 운동 진행도 보기">♡ 함께보기</button>
+      <button type="button" id="family-logout" class="family-tiny-button" aria-label="현재 계정 로그아웃">로그아웃</button>
+    </div>
+
+    <section id="family-progress" class="family-progress hidden" aria-label="가족 운동 진행도" aria-live="polite">
+      <div class="family-progress-title"><strong>OUR JOURNEY</strong><button id="family-close-progress" type="button" class="family-tiny-button">닫기 ✕</button></div>
+      <div class="family-journey-strip" aria-label="ME와 MOM의 주간 진행 위치">
+        <div class="family-journey-head">
+          <span id="family-journey-week">WEEK 1 · DAY 01–07</span>
+          <span>ME &amp; MOM</span>
+        </div>
+        <div class="family-journey-track" role="group" aria-label="일주일 운동 경로">
+          <div class="family-journey-line"></div>
+          <div class="family-journey-days">
+            <span>01</span><span>02</span><span>03</span><span>04</span><span>05</span><span>06</span><span>07</span>
+          </div>
+          <div id="family-marker-me" class="family-journey-marker me" style="left:7.1429%">
+            <span id="family-marker-me-label" class="family-journey-marker-label">ME · DAY 01</span>
+            <span class="family-journey-person" aria-hidden="true"><i class="head"></i><i class="torso"></i><i class="feet"></i></span>
+          </div>
+          <div id="family-marker-mom" class="family-journey-marker mom" style="left:7.1429%">
+            <span class="family-journey-person" aria-hidden="true"><i class="head"></i><i class="torso"></i><i class="feet"></i></span>
+            <span id="family-marker-mom-label" class="family-journey-marker-label">MOM · DAY 01</span>
+          </div>
+        </div>
+        <p class="family-journey-tip" id="family-journey-tip">실시간 기록을 기다리는 중...</p>
+      </div>
+      <div class="family-progress-grid">
+        <article class="family-progress-card">
+          <small>ME</small><strong id="family-me-day">DAY 01</strong>
+          <span id="family-me-detail">기록 기다리는 중...</span><em id="family-me-time">—</em>
+        </article>
+        <article class="family-progress-card">
+          <small>MOM</small><strong id="family-mom-day">DAY 01</strong>
+          <span id="family-mom-detail">기록 기다리는 중...</span><em id="family-mom-time">—</em>
+        </article>
+      </div>
+      <p id="family-progress-hint">각자의 운동은 독립적으로 진행돼요. 상대방의 기록은 읽기만 가능해요.</p>
+    </section>
+
+    <section id="family-auth" class="family-auth" aria-label="MOVE US 계정 로그인">
+      <div class="family-auth-card">
+        <p class="family-auth-eyebrow">MOVE:US · OUR JOURNEY</p>
+        <h2>함께, 각자의 자리에서</h2>
+        <p class="family-auth-description">한 곳에서는 나, 다른 곳에서는 엄마. 각자의 운동을 이어가고 서로의 성취를 확인해요.</p>
+        <form id="family-login-form" autocomplete="on">
+          <label for="family-email">이메일</label>
+          <input id="family-email" type="email" autocomplete="username" placeholder="name@example.com" required />
+          <label for="family-password">비밀번호</label>
+          <input id="family-password" type="password" autocomplete="current-password" placeholder="Firebase에서 만든 계정 비밀번호" required />
+          <button id="family-login-button" class="pixel-button primary" type="submit">▶ 로그인</button>
+        </form>
+        <p id="family-auth-message" role="status" aria-live="polite">Firebase 설정을 확인하는 중이에요.</p>
+        <div class="family-auth-bottom">
+          <button id="family-demo" type="button" class="family-tiny-button">로그인 없이 오프라인 테스트</button>
+        </div>
+        <p class="family-auth-note">오프라인 테스트에서는 상대방 기록 공유 및 저장이 작동하지 않아요.</p>
+      </div>
+    </section>
+
+    <!-- 1. 브라우저를 열면 맨 처음 보이는 메인 화면 -->
+    <section id="title-screen" class="screen menu-screen" aria-label="메인 메뉴">
+      <div class="title-content">
+        <p class="overline">PIXEL WORKOUT ADVENTURE</p>
+        <h1 class="logo">MOVE<span>:</span>US</h1>
+        <p class="tagline">작은 움직임이 모여 우리의 세계가 되다</p>
+        <nav class="menu-buttons" aria-label="메인 메뉴 버튼">
+          <button type="button" id="play-button" class="pixel-button primary">▶ PLAY</button>
+          <button type="button" id="howto-button" class="pixel-button">HOW TO PLAY</button>
+        </nav>
+      </div>
+      <p class="bottom-caption">NO LIVES · NO PRESSURE · PLAY AT YOUR PACE</p>
+    </section>
+
+    <!-- 2. PLAY를 누르면 나오는 레트로 월드맵 -->
+    <section id="map-screen" class="screen overlay-screen hidden" aria-label="월드맵">
+      <div class="map-week-nav" aria-label="주간 월드맵 탐색">
+        <button type="button" id="prev-week-button" class="pixel-button small" aria-label="이전 주">◀</button>
+        <div class="week-copy"><strong id="week-range">WEEK 1 · DAY 1–7</strong><small id="month-indicator">MONTH 1 · 0 DAY CLEAR</small></div>
+        <button type="button" id="next-week-button" class="pixel-button small" aria-label="다음 주">▶</button>
+      </div>
+      <div class="map-bottom-ui">
+        <button type="button" id="map-to-title-button" class="pixel-button small">← MAIN MENU</button>
+        <p id="map-status" class="status-chip" aria-live="polite">노란색 STAGE 1을 클릭하세요!</p>
+      </div>
+    </section>
+
+    <!-- 3. 스테이지: 스쿼트 → 중간 2종 랜덤 → 월 엔젤 요리 -->
+    <section id="game-screen" class="screen overlay-screen hidden" aria-label="게임 플레이">
+      <div id="mission-hud" class="mission-hud" aria-live="off">
+        <div class="hud-topline"><span id="hud-kicker">STAGE 01 · 1 / 4</span><span id="hud-set">JUMP</span></div>
+        <div class="hud-main"><strong id="hud-title">장애물 뛰어넘기</strong><span id="hud-count">0 / 10</span></div>
+        <div class="progress-track" role="progressbar" aria-label="운동 미션 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-track"><div id="progress-fill"></div></div>
+        <p id="hud-hint">스쿼트 1회를 하면 장애물 하나를 넘어요.</p>
+      </div>
+
+
+      <!-- 전신 영상은 잘림 없이 원본 비율을 유지하며, 창 크기/위치를 직접 조절할 수 있습니다. -->
+      <aside id="squat-panel" class="squat-panel" aria-label="운동 동작 카메라 인식">
+        <div class="squat-panel-title" id="squat-panel-drag" title="잡고 움직여서 카메라 창 위치 조절">
+          <strong id="tracking-exercise-title">BODY TRACKING · SQUAT</strong><span id="squat-signal">대기 중</span>
+        </div>
+        <div class="squat-video-box">
+          <canvas id="squat-preview" width="640" height="480" aria-label="실시간 웹캠 전체 영상과 관절점"></canvas>
+        </div>
+        <div class="squat-state">
+          <span id="squat-pose-label">카메라를 시작해 주세요.</span>
+          <strong id="squat-live-count">0 / 10</strong>
+        </div>
+        <p class="squat-notice" id="squat-notice" aria-live="polite">직접 학습한 스쿼트·푸시업 각 48개 자세 데이터를 사용해요. 카메라 영상은 저장하지 않습니다.</p>
+        <div class="squat-size-row">
+          <label for="squat-size">카메라 창 크기</label>
+          <input id="squat-size" type="range" min="260" max="720" step="10" value="390" aria-label="카메라 미리보기 크기 조절" />
+        </div>
+        <div class="squat-controls">
+          <button id="squat-start" type="button" class="pixel-button primary small">카메라 켜기</button>
+          <button id="squat-stop" type="button" class="pixel-button small" disabled>카메라 끄기</button>
+        </div>
+        <div class="squat-toggles">
+          <label><input id="squat-mirror" type="checkbox" /> 거울 보기</label>
+          <label><input id="squat-points" type="checkbox" checked /> 관절 표시</label>
+          <label><input id="squat-audio" type="checkbox" checked /> 횟수 알림음</label>
+        </div>
+      </aside>
+
+      <div id="mission-banner" class="mission-banner hidden" aria-live="polite"></div>
+
+      <!-- 무릎 대고 푸시업: 첫 10회 후 쉬는 시간, 다음 세트는 직접 시작 -->
+      <div id="pushup-rest" class="pushup-rest hidden" aria-live="polite">
+        <div class="pushup-rest-card">
+          <p class="overline">KNEE PUSH-UP · SET 1 CLEAR!</p>
+          <h2>10 / 20 COMPLETE</h2>
+          <p>첫 번째 세트를 완료했어요! 충분히 쉬고 준비가 되면 두 번째 10회를 시작하세요.</p>
+          <button id="pushup-next-set" type="button" class="pixel-button primary">▶ 2세트 시작 (10회)</button>
+        </div>
+      </div>
+
+      <div id="pause-panel" class="pause-panel hidden">
+        <div class="pause-card">
+          <h2>TAKE A BREAK</h2>
+          <p>쉬어도 괜찮아요. 준비되면 이어서 플레이하세요.</p>
+          <button type="button" id="resume-button" class="pixel-button primary">▶ RESUME</button>
+          <button type="button" id="restart-button" class="pixel-button small restart-button">↻ RESTART STAGE</button>
+        </div>
+      </div>
+
+      <div id="stage-clear" class="stage-clear hidden" aria-live="polite">
+        <div class="clear-card">
+          <p class="overline">GREAT JOB!</p>
+          <h2 id="clear-title">DAY 1 CLEAR!</h2>
+          <p id="clear-summary">오늘 완료한 운동: 스쿼트 · 플랭크 · 무릎 대고 푸시업 · 월 엔젤</p>
+          <p id="clear-milestone" class="clear-milestone">다음 스테이지가 열렸어요!</p>
+          <div class="clear-actions">
+            <button type="button" id="clear-next-button" class="pixel-button primary">▶ NEXT DAY</button>
+            <button type="button" id="clear-map-button" class="pixel-button primary">← WORLD MAP</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-bottom-ui">
+        <div class="game-actions">
+          <button type="button" id="pause-button" class="pixel-button small">Ⅱ PAUSE</button>
+          <button type="button" id="back-to-map-button" class="pixel-button small primary">↩ WORLD MAP</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 게임 설명: HOW TO PLAY에서 열고 닫습니다. -->
+    <section id="howto-screen" class="screen panel-screen hidden" aria-label="조작 방법">
+      <div class="info-panel">
+        <p class="overline">MOVE:US / GUIDE</p>
+        <h2>HOW TO PLAY</h2>
+        <p>① PLAY를 눌러 월드맵으로 이동하세요.</p>
+        <p>② 노란색으로 열린 DAY를 눌러 게임에 들어가세요. 주간 월드맵은 아직 완료하지 않아도 현재 주부터 최대 3주 뒤까지 ◀ ▶로 미리 볼 수 있습니다. 잠긴 DAY는 플레이할 수 없습니다.</p>
+        <p>③ 첫 번째 운동은 스쿼트입니다. 카메라를 켜고 스쿼트 1회를 하면 장애물 하나가 넘어갑니다. 10회 성공하면 다음 미션으로 이동합니다.</p>
+        <p>④ 중간 운동은 플랭크, 무릎 대고 푸시업, 스탠딩 힙 어브덕션 중 2종이 무작위로 등장합니다. 푸시업 미션에서는 카메라가 팔 펴기 → 팔 굽히기 → 다시 펴기를 감지할 때 벽이 하나씩 부서집니다. 10회 × 2세트(총 20회)이고 세트 사이 휴식은 자유롭습니다.</p>
+        <p>⑤ 마지막 운동은 월 엔젤입니다. 모닥불 피우기, 재료 썰기, 솥 젓기 순서로 요리가 완성돼요.</p>
+        <p>⑥ 월 엔젤 1세트: 장작 3번 → 스파크 1번 → 불 키우기 5번 → 솥 올리기 1번.</p>
+        <p>⑦ 월 엔젤 2세트: 칼질 10번. 3세트: 국자 젓기 10번. 세트 사이에는 원하는 만큼 쉴 수 있어요.</p>
+        <p>⑧ DAY를 클리어하면 다음 DAY가 자동으로 열립니다. 완료한 DAY는 재입장할 수 없고, 중간에 나온 DAY는 이어서 플레이할 수 있어요. DAY 7·14·21…에는 주간 축하, DAY 30·60…에는 월간 색 변화가 나타납니다.</p>
+        <p>⑨ 캐릭터는 운동 성공 시 자동으로 이동합니다. PAUSE 버튼으로 쉬거나 WORLD MAP 버튼으로 나갈 수 있어요.</p>
+        <p class="note">Firebase 로그인 상태에서는 DAY·진행 중 미션이 계정별로 저장되고 상대방의 진행도를 볼 수 있습니다. 오프라인 체험에서는 새로고침하면 기록이 초기화됩니다. 스쿼트와 무릎 대고 푸시업은 카메라 인식을 지원하며, 나머지 운동은 개발용 입력으로 시험합니다. 플랭크는 5초 한 번, 스쿼트는 10회, 푸시업은 10회 × 2세트, 사다리는 10칸 × 3개입니다. 정식 운동량과 다를 수 있습니다. 세트 사이 휴식은 자유롭고, 목숨·벌점 시스템은 없습니다. 처음부터 테스트하려면 PAUSE → RESTART STAGE를 눌러 주세요.</p>
+        <button type="button" id="howto-back-button" class="pixel-button primary">← BACK</button>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="sketch.js"></script>
+  <script src="squat-tracker.js"></script>
+  <script src="pushup-tracker.js"></script>
+  <script src="firebase-config.js"></script>
+  <script type="module" src="family-cloud.js"></script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MOVE:US | Knee Push-up Lab</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <script src="https://unpkg.com/ml5@1/dist/ml5.js"></script>
+</head>
+<body>
+<main class="app">
+  <header class="header">
+    <div class="brand"><div class="eyebrow">BODYPOSE · PERSONAL TRAINING</div>
+      <h1>MOVE<span>:</span>US <small>/ PUSH-UP LAB</small></h1>
+      <p>무릎 대고 푸시업 · 팔 편 자세 → 팔 굽힌 자세 → 팔 편 자세 · 10회 × 2세트</p>
+    </div>
+    <div class="beta">EXPERIMENT 02<br>본게임 변경 없음</div>
+  </header>
+  <section class="workspace">
+    <div class="camera-pane">
+      <div class="pane-title"><strong>LIVE CAMERA</strong><span id="camera-status" class="status">카메라 시작 대기</span></div>
+      <div class="video-shell"><div id="camera-canvas"></div>
+        <div id="video-placeholder" class="camera-placeholder"><div class="camera-symbol">▣</div><p>카메라 전신 영상</p><small>640×480 · 원본 비율 유지 · 영상 잘림 없음</small></div>
+      </div>
+      <div class="camera-actions">
+        <button id="start-camera" class="btn primary" type="button">① 카메라 시작</button>
+        <button id="stop-camera" class="btn" type="button" disabled>카메라 끄기</button>
+        <label class="toggle"><input id="mirror-mode" type="checkbox"> 거울 보기</label>
+        <label class="toggle"><input id="show-skeleton" type="checkbox" checked> 관절 표시</label>
+        <label class="toggle model-choice">모델
+          <select id="pose-model"><option value="SINGLEPOSE_THUNDER">정확도 우선 Thunder</option><option value="SINGLEPOSE_LIGHTNING">속도 우선 Lightning</option></select>
+        </label>
+        <label class="toggle"><input id="voice-enabled" type="checkbox" checked> 음성 + 알림음</label>
+      </div>
+      <div id="distance-instruction" class="distance-instruction">카메라 시작 후 자동 학습 버튼을 누르고, 카메라 옆쪽에서 무릎을 대고 자세를 잡아 주세요.</div>
+      <div class="training-guidance">
+        <strong>카메라 권장 위치</strong> — 휴대폰/웹캠을 낮은 위치에 두고 몸을 옆쪽 또는 30~45도 비스듬한 각도에서 찍어 주세요.
+        어깨·팔꿈치·손목이 확실히 보이는 게 중요해요. 무릎을 대고 하되, 관절 추적만으로 무릎이 실제 바닥에 닿았는지 확인할 수는 없어요.
+      </div>
+      <p id="camera-help" class="hint">작게 보일 정도로 멀리 물러날 필요는 없어요. 상체와 손목이 프레임에 잡히는 위치를 우선 확인해 주세요.</p>
+    </div>
+    <aside class="side-pane">
+      <section class="info-card status-card">
+        <div class="card-label">PUSH-UP COUNTER</div>
+        <div id="recognized-pose" class="recognized">학습 전</div>
+        <div class="confidence-line">분류 신뢰도 <strong id="recognition-confidence">--</strong></div>
+        <div id="sequence-text" class="sequence">팔 펴기 → 내려가기 → 팔 펴기</div>
+        <div class="set-progress"><span id="set-1-pill" class="set-pill active">SET 1</span><span id="set-2-pill" class="set-pill">SET 2</span></div>
+        <div class="count"><span id="pushup-count">0</span><small>/10</small></div>
+        <div id="count-detail" class="count-detail">세트 1 / 2 · 전체 0 / 20회</div>
+        <button id="next-set" class="btn primary" type="button" disabled>▶ 쉬고 다음 세트 시작</button>
+        <div id="set-notice" class="set-notice" aria-live="polite">처음에는 자세 데이터를 학습해 주세요.</div>
+      </section>
+      <section class="info-card">
+        <div class="card-label">BODY CHECK</div>
+        <div class="check-grid"><span>관절 검출</span><strong id="joints-state">대기</strong><span>학습 가능한 팔</span><strong id="pose-quality">대기</strong><span>모델 상태</span><strong id="model-status">연결 전</strong></div>
+        <p id="tracking-detail" class="tracking-detail">어깨·팔꿈치·손목 좌표와 신뢰도를 확인해요.</p>
+      </section>
+      <section class="info-card"><div class="card-label">PROGRESS</div>
+        <p id="log" class="live-log" aria-live="polite">카메라 시작 → 두 자세 수집 → 학습 → 10회씩 2세트 측정.</p></section>
+    </aside>
+  </section>
+  <section class="training-pane">
+    <div class="training-intro">
+      <div class="eyebrow">TEACH YOUR MOVEMENT</div><h2>② 푸시업 자세 직접 학습하기</h2>
+      <p>기존 SQUAT LAB의 학습 과정을 응용했어. 자동 학습 버튼을 한 번 누르면 음성 안내에 따라 <strong>위 → 아래 → 위 → 아래 → 위 → 아래</strong> 자세를 수집해. 자세마다 8개씩 3번, 총 24개씩 학습해. 이후 10회 × 2세트 측정을 시작해.</p>
+    </div>
+    <div class="guided-panel"><div class="guided-head"><div><div class="eyebrow">HANDS-FREE GUIDE</div><strong>멀리서도 음성 안내를 듣고 등록</strong></div><span id="guided-progress">대기</span></div>
+      <p id="guided-hint">팔 편 자세와 굽힌 자세를 번갈아 유지해 주세요. 수집 중에는 동작하지 말고 1~2초만 자세를 유지해요.</p>
+      <div class="guided-controls"><button id="guided-start" class="btn primary" type="button" disabled>▶ 자동 학습 시작</button><button id="guided-cancel" class="btn" type="button" disabled>자동 학습 취소</button></div>
+    </div>
+    <div class="train-grid">
+      <div class="train-card"><div class="train-icon">↑</div><h3>UP <small>팔 편 자세</small></h3>
+        <p>무릎 대고 푸시업 시작 자세. 팔꿈치를 편 상태에서 몸을 지탱해 주세요.</p>
+        <div class="sample-count"><strong id="up-count">0</strong><span> / 권장 24개 이상</span></div>
+        <div class="sample-track"><div id="up-fill"></div></div>
+        <button id="capture-up" class="btn" type="button" disabled>팔 편 자세 8개 수집 예약</button></div>
+      <div class="train-card"><div class="train-icon">↓</div><h3>DOWN <small>팔 굽힌 자세</small></h3>
+        <p>팔꿈치를 굽혀 몸을 편안하게 낮춘 자세. 통증이 생기면 즉시 멈춰 주세요.</p>
+        <div class="sample-count"><strong id="down-count">0</strong><span> / 권장 24개 이상</span></div>
+        <div class="sample-track"><div id="down-fill"></div></div>
+        <button id="capture-down" class="btn" type="button" disabled>팔 굽힌 자세 8개 수집 예약</button></div>
+    </div>
+    <div class="training-bottom">
+      <button id="train-button" class="btn primary" type="button" disabled>③ 수집한 자세로 학습</button>
+      <button id="measure-button" class="btn primary" type="button" disabled>④ 푸시업 측정 시작</button>
+      <button id="pause-measure" class="btn" type="button" disabled>측정 잠깐 중지</button>
+      <button id="reset-count" class="btn" type="button">카운트 처음부터</button>
+      <button id="export-data" class="btn" type="button" disabled>학습 데이터 JSON 저장</button>
+      <label for="import-data" class="btn file-label">JSON 불러오기<input id="import-data" type="file" accept=".json,application/json" hidden></label>
+    </div>
+    <div class="training-note"><p>현재 테스트는 <strong>서버·브라우저 영구 저장을 하지 않아</strong> 새로고침하면 초기화돼. 잘 작동하는 데이터는 JSON으로 저장해 보내줘. 그러면 게임 속 벽 부수기에 연결할 수 있어. 측정은 자세를 판별할 뿐 정확한 운동 자세나 안전을 보증하지 않아.</p><p>앉았다 일어나는 스쿼트와 달리 푸시업은 손목·팔꿈치가 겹쳐 보이기 쉬워. 팔 전체가 잘 보이는 위치에서 학습과 측정을 진행해 줘.</p></div>
+  </section>
+  <footer>MOVE:US — KNEE PUSH-UP EXPERIMENT · PERSONAL BODYPOSE TRAINING</footer>
+</main>
+<script src="sketch.js"></script>
+</body>
+</html>

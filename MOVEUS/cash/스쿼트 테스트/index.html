@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MOVE:US | Squat Auto Training Lab</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <script src="https://unpkg.com/ml5@1/dist/ml5.js"></script>
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <div class="brand"><div class="eyebrow">BODY TRACKING · TRAINING LAB</div><h1>MOVE<span>:</span>US <small>/ SQUAT TEST</small></h1><p>화면에서 멀리 떨어져 있어도 음성 안내에 따라 자동으로 학습하고 스쿼트를 세는 실험실</p></div>
+      <div class="beta">EXPERIMENT 01<br />게임 본체와 분리됨</div>
+    </header>
+
+    <section class="workspace" aria-label="스쿼트 카메라 테스트">
+      <div class="camera-pane">
+        <div class="pane-title"><strong>LIVE CAMERA</strong><span id="camera-status" class="status">카메라를 시작해 주세요</span></div>
+        <div class="video-shell"><div id="camera-canvas"></div><div class="camera-placeholder" id="video-placeholder"><div class="camera-symbol">▣</div><p>여기에 전신 카메라 영상이 표시돼요</p><small>640 × 480 · 원본 비율 유지 · 화면 잘림 없음</small></div></div>
+        <div class="camera-actions"><button class="btn primary" id="start-camera" type="button">① 카메라 시작</button><button class="btn" id="stop-camera" type="button" disabled>카메라 끄기</button><label class="toggle"><input id="mirror-mode" type="checkbox" /> 거울처럼 보기</label><label class="toggle"><input id="show-skeleton" type="checkbox" checked /> 관절 표시</label><label class="toggle model-choice">모델 <select id="pose-model" aria-label="신체 인식 모델"><option value="SINGLEPOSE_THUNDER">정확도 우선 (Thunder)</option><option value="SINGLEPOSE_LIGHTNING">속도 우선 (Lightning)</option><option value="MULTIPOSE_LIGHTNING">기존 기본 모델</option></select></label><label class="toggle"><input id="voice-enabled" type="checkbox" checked /> 한국어 음성 + 알림음</label></div>
+        <div id="distance-instruction" class="distance-instruction" aria-live="polite">카메라를 켠 후 아래의 <b>자동 학습 시작</b>을 누르고 뒤로 이동해 주세요.</div><p id="camera-help" class="hint" aria-live="polite">얼굴에서 발까지 화면에 나오도록 배치해 주세요. 학습은 양쪽 중 인식이 좋은 어깨·골반·무릎 3개 관절을 사용해요. 발목이 잘 안 잡혀도 수집할 수 있어요.</p>
+      </div>
+
+      <aside class="side-pane">
+        <section class="info-card status-card"><div class="card-label">LIVE RECOGNITION</div><div class="recognized" id="recognized-pose">아직 학습 전</div><div class="confidence-line">인식 확신도 <strong id="recognition-confidence">--</strong></div><div class="sequence" id="sequence-text">선 자세 → 앉은 자세 → 선 자세</div><div class="count"><span id="squat-count">0</span><small>회</small></div><div class="caption">신체가 잠시 가려져도 횟수는 줄어들지 않아요.</div></section>
+        <section class="info-card"><div class="card-label">BODY CHECK</div><div class="check-grid"><span>관절 검출</span><strong id="joints-state">대기</strong><span>유효한 몸 자세</span><strong id="pose-quality">대기</strong><span>모델 상태</span><strong id="model-status">연결 전</strong></div><p class="tracking-detail" id="tracking-detail">카메라를 켜면 어떤 관절이 인식되는지 표시돼요.</p></section>
+        <section class="info-card"><div class="card-label">PROGRESS</div><p id="log" class="live-log" aria-live="polite">카메라 시작 → 자세 데이터 수집 → 학습 → 횟수 측정 순서로 진행하세요.</p></section>
+      </aside>
+    </section>
+
+    <section class="training-pane" aria-label="자세 학습">
+      <div class="training-intro"><div class="eyebrow">TEACH YOUR MOVEMENT</div><h2>② 내 자세 등록하기</h2><p>먼저 아래 <b>자동 학습 시작</b>을 한 번 눌러 줘. 컴퓨터에서 멀리 떨어진 다음, 음성 안내에 따라 서기 → 앉기 → 서기 → 앉기 자세를 차례로 보여 주면 각각 24개씩 자동 수집하고 학습 후 측정까지 시작해. 기존 수동 수집도 가능해.</p></div>
+      <div class="guided-panel"><div class="guided-head"><div><div class="eyebrow">HANDS-FREE GUIDE</div><strong>화면을 보지 않아도 되는 자동 학습</strong></div><span id="guided-progress">시작 대기</span></div><p id="guided-hint">카메라를 켠 뒤 시작 버튼을 눌러 주세요. 수집은 유효한 전신이 확인되기 전까지 기다립니다.</p><div class="guided-controls"><button class="btn primary" id="guided-start" disabled type="button">▶ 자동 학습 시작 (원터치)</button><button class="btn" id="guided-cancel" disabled type="button">자동 학습 취소</button></div></div><div class="train-grid">
+        <div class="train-card"><div class="train-icon">↑</div><h3>STANDING <small>선 자세</small></h3><p>양발을 바닥에 두고 똑바로 서 있어 줘.</p><div class="sample-count"><strong id="standing-count">0</strong><span> / 권장 36개 이상</span></div><div class="sample-track"><div id="standing-fill"></div></div><button class="btn" id="capture-standing" disabled>선 자세 12개 수집 예약</button></div>
+        <div class="train-card"><div class="train-icon">↓</div><h3>SQUATTING <small>앉은 자세</small></h3><p>편안한 범위에서 스쿼트의 낮은 자세를 잠시 유지해 줘. 오래 버틸 필요는 없어.</p><div class="sample-count"><strong id="squatting-count">0</strong><span> / 권장 36개 이상</span></div><div class="sample-track"><div id="squatting-fill"></div></div><button class="btn" id="capture-squatting" disabled>앉은 자세 12개 수집 예약</button></div>
+      </div>
+      <div class="training-bottom"><button id="train-button" class="btn primary" disabled>③ 수집한 자세로 학습하기</button><button id="measure-button" class="btn primary" disabled>④ 스쿼트 측정 시작</button><button id="pause-measure" class="btn" disabled>측정 중지</button><button id="reset-count" class="btn" type="button">횟수 0으로</button><button id="export-data" class="btn" disabled>학습 데이터 JSON 저장</button><label class="btn file-label" for="import-data">JSON 불러오기<input type="file" id="import-data" accept=".json,application/json" hidden /></label></div>
+      <div class="training-note"><p>버튼을 누르고 뒤로 걸어가도 괜찮아. 유효한 주요 관절이 인식될 때까지 대기하며, 자세가 사라지면 수집을 일시정지해. 소리가 들리지 않으면 PC 볼륨 및 Chrome 탭 음소거 상태를 확인해. 자동 음성은 브라우저 음성 합성 지원 여부에 따라 달라질 수 있어.<br /><br />학습은 브라우저 안에서만 진행돼. 새로고침하면 훈련과 횟수가 초기화되지만, <b>JSON 저장</b>을 눌러 학습 데이터만 컴퓨터에 내려받았다가 다시 불러올 수 있어. 영상은 저장하지 않아.</p><p><b>중요:</b> 관절점이 어긋나거나 일부가 가려지면 그 프레임은 수집하지 않아. 카메라 거리를 먼저 맞추고 학습해 줘. 이 테스트는 운동 횟수를 시험하기 위한 것이며 올바른 운동 자세나 안전성을 보증하지 않아.</p></div>
+    </section>
+    <footer>MOVE:US — INDEPENDENT SQUAT EXPERIMENT · VERSION C · NO GAME FILES CHANGED</footer>
+  </main>
+  <script src="sketch.js"></script>
+</body>
+</html>
